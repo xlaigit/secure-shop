@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>安全练习商城</title>
+</head>
+<body>
+  <div style="margin-bottom:10px">
+    <% if (user) { %>
+      欢迎，<%= user.username %> | 余额：<%= user.balance %> 元
+      | <a href="/shop">商城</a> | <a href="/orders">订单</a> | <a href="/logout">注销</a>
+    <% } else { %>
+      <a href="/login">登录</a> | <a href="/register">注册</a>
+    <% } %>
+  </div>
+  <hr>
+  <h2>商品列表</h2>
+  <ul>
+    <% products.forEach(p => { %>
+      <li>
+        <strong><%= p.name %></strong> - ¥<%= p.price %>
+        <form action="/buy" method="POST" style="display:inline">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="product_id" value="<%= p.id %>">
+          <button type="submit">购买</button>
+        </form>
+      </li>
+    <% }) %>
+  </ul>
+</body>
+</html>

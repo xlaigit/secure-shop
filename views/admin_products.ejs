@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>后台管理</title>
+</head>
+<body>
+  <div style="margin-bottom:10px">
+    管理员：<%= user.username %>
+    | <a href="/admin/dashboard">控制台</a>
+    | <a href="/admin/products">商品管理</a>
+    | <a href="/admin/users">用户管理</a>
+    | <a href="/admin/orders">订单管理</a>
+    | <a href="/admin/logout">退出</a>
+  </div>
+  <hr>
+  <h2>商品管理</h2>
+  <a href="/admin/products/add">添加新商品</a>
+  <table border="1" cellpadding="5">
+    <tr><th>ID</th><th>名称</th><th>价格</th><th>操作</th></tr>
+    <% products.forEach(p => { %>
+      <tr>
+        <td><%= p.id %></td>
+        <td><%= p.name %></td>
+        <td>¥<%= p.price %></td>
+        <td>
+          <a href="/admin/products/edit/<%= p.id %>">编辑</a>
+          <form action="/admin/products/delete/<%= p.id %>" method="POST" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" onclick="return confirm('确认删除？')">删除</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+</body>
+</html>

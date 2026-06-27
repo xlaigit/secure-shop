@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>后台管理</title>
+</head>
+<body>
+  <div style="margin-bottom:10px">
+    管理员：<%= user.username %>
+    | <a href="/admin/dashboard">控制台</a>
+    | <a href="/admin/products">商品管理</a>
+    | <a href="/admin/users">用户管理</a>
+    | <a href="/admin/orders">订单管理</a>
+    | <a href="/admin/logout">退出</a>
+  </div>
+  <hr>
+  <h2><%= product ? '编辑商品' : '添加商品' %></h2>
+  <form method="POST" action="<%= action %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>名称：<input name="name" value="<%= product ? product.name : '' %>" required></label><br>
+    <label>价格：<input type="number" step="0.01" name="price" value="<%= product ? product.price : '' %>" required></label><br>
+    <button type="submit">保存</button>
+    <a href="/admin/products">取消</a>
+  </form>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>个人资料</title>
+</head>
+<body>
+  <div style="margin-bottom:10px">
+    欢迎，<%= user.username %> | 余额：<%= user.balance %> 元
+    | <a href="/shop">商城</a> | <a href="/orders">订单</a> | <a href="/profile">头像</a> | <a href="/logout">注销</a>
+  </div>
+  <hr>
+  <h2>上传头像</h2>
+  <% if (msg) { %><p style="color:green"><%= msg %></p><% } %>
+
+  <h3>方式1：本地上传</h3>
+  <form action="/upload" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="file" name="avatar" required>
+    <button type="submit">上传</button>
+  </form>
+
+  <h3>方式2：通过URL上传（测SSRF）</h3>
+  <form action="/upload-url" method="POST">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="text" name="imageUrl" placeholder="输入图片URL" style="width:300px" required>
+    <button type="submit">通过URL上传</button>
+  </form>
+</body>
+</html>

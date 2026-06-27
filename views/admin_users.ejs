@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>后台管理</title></head>
+<body>
+  <div style="margin-bottom:10px">
+    管理员：<%= user.username %>
+    | <a href="/admin/dashboard">控制台</a>
+    | <a href="/admin/products">商品管理</a>
+    | <a href="/admin/users">用户管理</a>
+    | <a href="/admin/orders">订单管理</a>
+    | <a href="/admin/logout">退出</a>
+  </div>
+  <hr>
+  <h2>用户管理</h2>
+  <table border="1" cellpadding="5">
+    <tr><th>ID</th><th>用户名</th><th>余额</th><th>角色</th><th>改余额</th><th>注销</th></tr>
+    <% users.forEach(u => { %>
+      <tr>
+        <td><%= u.id %></td>
+        <td><%= u.username %></td>
+        <td>¥<%= u.balance %></td>
+        <td><%= u.is_admin ? '管理员' : '用户' %></td>
+        <td>
+          <form action="/admin/users/balance/<%= u.id %>" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="number" name="balance" value="<%= u.balance %>" step="0.01" style="width:80px">
+            <button type="submit">修改</button>
+          </form>
+        </td>
+        <td>
+          <% if (!u.is_admin) { %>
+            <form action="/admin/users/delete/<%= u.id %>" method="POST">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" onclick="return confirm('确认注销？')">注销</button>
+            </form>
+          <% } else { %>-<% } %>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+</body>
+</html>

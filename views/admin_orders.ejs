@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>后台管理</title>
+</head>
+<body>
+  <div style="margin-bottom:10px">
+    管理员：<%= user.username %>
+    | <a href="/admin/dashboard">控制台</a>
+    | <a href="/admin/products">商品管理</a>
+    | <a href="/admin/users">用户管理</a>
+    | <a href="/admin/orders">订单管理</a>
+    | <a href="/admin/logout">退出</a>
+  </div>
+  <hr>
+  <h2>订单管理</h2>
+  <table border="1" cellpadding="5">
+    <tr><th>订单ID</th><th>用户</th><th>商品</th><th>金额</th><th>时间</th></tr>
+    <% orders.forEach(o => { %>
+      <tr>
+        <td><%= o.id %></td>
+        <td><%= o.username %></td>
+        <td><%= o.product_name %></td>
+        <td>¥<%= o.price %></td>
+        <td><%= o.created_at %></td>
+      </tr>
+    <% }) %>
+  </table>
+</body>
+</html>
