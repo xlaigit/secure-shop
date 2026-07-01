@@ -1,20 +1,202 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>后台管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>控制台 · 后台管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
+    .topbar{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .topbar .left{display:flex;align-items:center;gap:12px}
+    .topbar .logo{width:38px;height:38px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .topbar .logo svg{width:20px;height:20px;color:white}
+    .topbar .title{font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .topbar .title small{display:block;font-size:12px;color:#6b7280;font-weight:500;margin-top:2px}
+    .topbar nav{display:flex;flex-wrap:wrap;gap:4px}
+    .topbar nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
+    .topbar nav a:hover{background:#f3f4f6;color:#667eea}
+    .topbar nav a.active{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.3)}
+    .topbar nav a.danger{color:#dc2626}
+    .topbar nav a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1200px;margin:0 auto;padding:28px}
+    .welcome{margin-bottom:24px}
+    .welcome h1{font-size:26px;font-weight:700;letter-spacing:-0.5px}
+    .welcome p{color:#6b7280;font-size:14px;margin-top:6px}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px}
+    .stat{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border-left:4px solid #667eea;text-decoration:none;color:inherit;display:block}
+    .stat:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,0.08)}
+    .stat .label{font-size:12.5px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+    .stat .num{font-size:32px;font-weight:700;color:#1f2937;margin-top:8px;letter-spacing:-1px}
+    .stat .ico{float:right;font-size:24px;margin-top:-4px;opacity:0.6}
+    .stat.users{border-left-color:#3b82f6}
+    .stat.products{border-left-color:#10b981}
+    .stat.orders{border-left-color:#f59e0b}
+    .stat.reports{border-left-color:#ef4444;background:linear-gradient(135deg,#fff 0%,#fef2f2 100%)}
+    .stat.appeals{border-left-color:#8b5cf6;background:linear-gradient(135deg,#fff 0%,#f5f3ff 100%)}
+    .section-title{font-size:16px;font-weight:700;margin:12px 0 14px;color:#1f2937;display:flex;align-items:center;gap:8px}
+    .section-title::before{content:'';width:4px;height:18px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:2px}
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06);text-decoration:none;color:inherit;transition:all 0.2s;display:block;border:2px solid transparent}
+    .card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,0.1);border-color:#e5e7eb}
+    .card .ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+    .card .ico svg{width:24px;height:24px;color:white}
+    .card h3{font-size:16px;font-weight:600;margin-bottom:6px;letter-spacing:-0.2px}
+    .card p{color:#6b7280;font-size:13px;line-height:1.55}
+    .card .tag{display:inline-block;margin-top:12px;font-size:12px;color:#667eea;font-weight:600}
+    .card.report-card{background:linear-gradient(135deg,#fff 0%,#fef2f2 100%)}
+    .card.report-card .ico{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    .card.appeal-card{background:linear-gradient(135deg,#fff 0%,#f5f3ff 100%)}
+    .card.appeal-card .ico{background:linear-gradient(135deg,#8b5cf6,#7c3aed)}
+    .card.user-card .ico{background:linear-gradient(135deg,#3b82f6,#1d4ed8)}
+    .card.product-card .ico{background:linear-gradient(135deg,#10b981,#059669)}
+    .card.order-card .ico{background:linear-gradient(135deg,#f59e0b,#d97706)}
+    .card.chat-card .ico{background:linear-gradient(135deg,#8b5cf6,#7c3aed)}
+    .card.monitor-card .ico{background:linear-gradient(135deg,#06b6d4,#0891b2)}
+    .notice{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .notice h3{font-size:15px;font-weight:600;margin-bottom:12px;color:#374151;display:flex;align-items:center;gap:8px}
+    .notice ul{list-style:none;padding:0}
+    .notice li{padding:10px 12px;background:#f9fafb;border-radius:10px;margin-bottom:8px;font-size:13px;color:#4b5563;display:flex;justify-content:space-between;align-items:center}
+    .notice li:last-child{margin-bottom:0}
+    .notice li span.hot{background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+    @media (max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-  <div style="margin-bottom:10px">
-    管理员：<%= user.username %>
-    | <a href="/admin/dashboard">控制台</a>
-    | <a href="/admin/products">商品管理</a>
-    | <a href="/admin/users">用户管理</a>
-    | <a href="/admin/orders">订单管理</a>
-    | <a href="/admin/logout">退出</a>
+  <div class="topbar">
+    <div class="left">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+      </div>
+      <div class="title">后台管理系统<small>Security Practice Mall · Admin Panel</small></div>
+    </div>
+    <nav>
+      <a class="active" href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/refunds" class="menu-item">
+        <span class="icon">💸</span>
+       <span class="text">退款管理</span>
+      </a>
+      <a href="/admin/reports">🚩 举报管理</a>
+      <a href="/admin/appeals">📢 申诉管理</a>
+      <a href="/admin/users">👥 用户管理</a>
+      <a href="/admin/products">📦 商品管理</a>
+      <a href="/admin/orders">📋 订单管理</a>
+      <a href="/chat">💬 聊天室</a>
+      <a class="danger" href="/admin/logout">退出</a>
+    </nav>
   </div>
-  <hr>
-  <h2>后台控制台</h2>
-  <p>欢迎使用后台管理。</p>
+
+  <div class="container">
+    <div class="welcome">
+      <h1>👋 欢迎回来，<%= user.username %></h1>
+      <p>以下是平台最新概况，点击卡片可进入对应功能模块</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat users">
+        <span class="ico">👥</span>
+        <div class="label">注册用户</div>
+        <div class="num"><%= userCount %></div>
+      </div>
+      <div class="stat products">
+        <span class="ico">📦</span>
+        <div class="label">商品数量</div>
+        <div class="num"><%= productCount %></div>
+      </div>
+      <div class="stat orders">
+        <span class="ico">📋</span>
+        <div class="label">订单总数</div>
+        <div class="num"><%= orderCount %></div>
+      </div>
+      <a href="/admin/reports" class="stat reports">
+        <span class="ico">🚩</span>
+        <div class="label">待处理举报</div>
+        <div class="num"><%= pendingReports %></div>
+      </a>
+      <a href="/admin/appeals" class="stat appeals">
+        <span class="ico">📢</span>
+        <div class="label">待处理申诉</div>
+        <div class="num"><%= pendingAppeals %></div>
+      </a>
+    </div>
+
+    <div class="section-title">功能快捷入口</div>
+    <div class="cards">
+      <a href="/admin/reports" class="card report-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </div>
+        <h3>🚩 举报管理中心</h3>
+        <p>查看并处理所有用户提交的举报</p>
+        <span class="tag">进入举报管理 →</span>
+      </a>
+      <a href="/admin/appeals" class="card appeal-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </div>
+        <h3>📢 申诉管理中心</h3>
+        <p>处理用户提交的账号、店铺申诉，支持通过/驳回并自动解封</p>
+        <span class="tag">进入申诉管理 →</span>
+      </a>
+      <a href="/admin/users" class="card user-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+        <h3>👥 用户管理</h3>
+        <p>管理平台用户，支持封禁/解封、调整余额、信誉分恢复与警告解除</p>
+        <span class="tag">进入用户管理 →</span>
+      </a>
+      <a href="/admin/products" class="card product-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <h3>📦 商品管理</h3>
+        <p>添加、编辑、删除平台官方商品</p>
+        <span class="tag">进入商品管理 →</span>
+      </a>
+      <a href="/admin/orders" class="card order-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="8" rx="2" ry="2"/><circle cx="9" cy="20" r="1"/><circle cx="15" cy="20" r="1"/></svg>
+        </div>
+        <h3>📋 订单管理</h3>
+        <p>查看所有用户的交易订单</p>
+        <span class="tag">进入订单管理 →</span>
+      </a>
+      <a href="/chat" class="card chat-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>💬 公共聊天室</h3>
+        <p>进入管理员视角的公共聊天区</p>
+        <span class="tag">进入聊天室 →</span>
+      </a>
+      <a href="/dashboard" class="card monitor-card">
+        <div class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>🛡️ 安全监控</h3>
+        <p>实时检测 XSS、SQL 注入等攻击行为</p>
+        <span class="tag">进入监控面板 →</span>
+      </a>
+    </div>
+    <div class="quick-entry">
+        <h3>💸 退款管理中心</h3>
+        <p>处理用户提交的退款申请，支持通过/驳回</p>
+        <a href="/admin/refunds" class="btn">进入退款管理 →</a>
+    </div>
+
+    <div class="section-title">使用提示</div>
+    <div class="notice">
+      <h3>📌 管理员日常操作建议</h3>
+      <ul>
+        <li><span>每日查看 <strong>举报管理</strong> 和 <strong>申诉管理</strong>，及时处理用户反馈</span><span class="hot">优先</span></li>
+        <li><span>检查 <strong>用户管理</strong> 中信誉分过低或被警告的用户</span></li>
+        <li><span>关注 <strong>安全监控</strong> 中是否出现异常攻击记录</span></li>
+        <li><span>避免在商品管理中创建价格不合理的商品（最低 1 元）</span></li>
+        <li><span>管理员账号不可进行普通用户操作（如加好友、购买商品）</span></li>
+      </ul>
+    </div>
+  </div>
 </body>
 </html>

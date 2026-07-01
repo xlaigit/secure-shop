@@ -1,0 +1,87 @@
+<!-- 文件: d:\肖宇帆\HTML项目\views\admin_appeals.ejs -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>申诉管理 - 后台</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;padding:20px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:24px;color:#2d3748;margin-bottom:20px}
+  .nav{margin-bottom:20px}
+  .nav a{color:#4299e1;text-decoration:none;margin-right:15px;font-size:14px}
+  .nav a:hover{text-decoration:underline}
+  table{width:100%;background:white;border-collapse:collapse;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+  th{background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:15px 12px;text-align:left;font-size:13px;letter-spacing:1px}
+  td{padding:15px 12px;border-bottom:1px solid #edf2f7;font-size:13px;color:#2d3748;vertical-align:top}
+  tr:hover{background:#f7fafc}
+  .tag{display:inline-block;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600}
+  .pending{background:#fef3c7;color:#92400e}
+  .accepted{background:#d4edda;color:#155724}
+  .rejected{background:#f8d7da;color:#721c24}
+  .content-cell{max-width:350px;line-height:1.6}
+  textarea{width:100%;min-height:60px;padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-family:inherit;font-size:12px;resize:vertical;margin-bottom:6px}
+  .btn{padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;transition:all .15s}
+  .btn-ac{background:#48bb78;color:white}
+  .btn-ac:hover{background:#38a169}
+  .btn-rj{background:#fc8181;color:white}
+  .btn-rj:hover{background:#f56565}
+  .empty{text-align:center;padding:40px;color:#a0aec0}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="/admin/dashboard"><i class="fas fa-home"></i> 仪表盘</a>
+      <a href="/admin/users"><i class="fas fa-users"></i> 用户</a>
+      <a href="/admin/shops"><i class="fas fa-store"></i> 店铺</a>
+      <a href="/admin/reports"><i class="fas fa-flag"></i> 举报</a>
+    </div>
+    <h1><i class="fas fa-gavel"></i> 申诉管理</h1>
+    <% if (appeals && appeals.length) { %>
+      <table>
+        <tr>
+          <th>ID</th><th>玩家</th><th>类型</th><th>内容</th><th>状态</th><th>时间</th><th>回复/操作</th>
+        </tr>
+        <% appeals.forEach(function(a) { %>
+        <tr>
+          <td>#<%= a.id %></td>
+          <td><strong><%= a.username %></strong></td>
+          <td>
+            <%= a.appeal_type === 'ban' ? '账号封禁' : 
+                a.appeal_type === 'shop_ban' ? '店铺封禁' : 
+                a.appeal_type === 'warning' ? '警告限制' : a.appeal_type %>
+          </td>
+          <td class="content-cell"><%= a.content %></td>
+          <td><span class="tag <%= a.status %>"><%= a.status === 'pending' ? '待处理' : a.status === 'accepted' ? '已通过' : '已驳回' %></span></td>
+          <td><%= a.created_at %></td>
+          <td>
+            <% if (a.status === 'pending') { %>
+              <form action="/admin/appeals/<%= a.id %>/accept" method="post" style="display:inline">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <textarea name="reply" placeholder="管理员回复...（可选）"></textarea>
+                <button type="submit" class="btn btn-ac">✅ 通过并解封</button>
+              </form>
+              <form action="/admin/appeals/<%= a.id %>/reject" method="post" style="display:inline">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <textarea name="reply" placeholder="驳回理由...（可选）"></textarea>
+                <button type="submit" class="btn btn-rj">❌ 驳回</button>
+              </form>
+            <% } else { %>
+              <div style="font-size:12px;color:#718096;line-height:1.6;background:#f7fafc;padding:8px;border-radius:6px">
+                <strong>管理员回复：</strong><br><%= a.admin_reply || '(无)' %>
+              </div>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </table>
+    <% } else { %>
+      <div class="empty">📭 暂无申诉记录</div>
+    <% } %>
+  </div>
+</body>
+</html>

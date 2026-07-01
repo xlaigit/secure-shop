@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>账号已封禁 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;min-height:100vh;background:linear-gradient(135deg,#7f1d1d 0%,#450a0a 50%,#1c1917 100%);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden}
+    body::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(239,68,68,0.2),transparent 60%);pointer-events:none}
+    .particle{position:absolute;width:120px;height:120px;border-radius:50%;background:rgba(239,68,68,0.08);animation:float 20s infinite linear;pointer-events:none}
+    .particle:nth-child(1){top:-30px;left:15%;animation-duration:25s}
+    .particle:nth-child(2){width:180px;height:180px;bottom:10%;right:5%;animation-duration:30s;animation-delay:-10s}
+    @keyframes float{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(40px,-30px) rotate(360deg)}}
+    .container{position:relative;z-index:1;width:100%;max-width:520px}
+    .card{background:rgba(28,25,23,0.9);border:1px solid rgba(239,68,68,0.3);border-radius:24px;padding:44px 40px;box-shadow:0 25px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(239,68,68,0.1) inset;backdrop-filter:blur(20px);text-align:center}
+    .icon-wrap{width:100px;height:100px;margin:0 auto 24px;background:linear-gradient(135deg,#dc2626,#991b1b);border-radius:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 32px rgba(220,38,38,0.45);animation:shake 0.6s ease}
+    @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
+    .icon-wrap svg{width:52px;height:52px;color:white}
+    h1{font-size:28px;color:#fef2f2;font-weight:700;letter-spacing:-0.5px;margin-bottom:10px}
+    .sub{color:#fca5a5;font-size:14.5px;line-height:1.6;margin-bottom:24px}
+    .user-box{background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.3);border-radius:14px;padding:16px 20px;margin-bottom:22px;font-size:14px;color:#fecaca;display:inline-block}
+    .user-box strong{color:#fef2f2;font-weight:700;font-size:15.5px;margin-left:6px}
+    .reasons{background:rgba(15,23,42,0.5);border:1px solid rgba(254,202,202,0.15);border-radius:16px;padding:20px 22px;margin-bottom:22px;text-align:left}
+    .reasons h3{color:#fef2f2;font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .reasons ul{list-style:none;padding:0;margin:0}
+    .reasons li{color:#fca5a5;font-size:13.5px;line-height:1.7;padding-left:22px;position:relative;margin-bottom:4px}
+    .reasons li::before{content:'•';position:absolute;left:6px;color:#ef4444;font-weight:700}
+    .contact{background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:14px;padding:16px 20px;margin-bottom:22px;font-size:13.5px;color:#93c5fd;line-height:1.6;text-align:left}
+    .contact strong{color:#dbeafe}
+    .btn{width:100%;padding:13px 20px;border:none;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fecaca;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;text-decoration:none;display:block}
+    .btn:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:#fef2f2}
+    .footer{text-align:center;margin-top:20px;color:rgba(254,202,202,0.5);font-size:12.5px;font-weight:500}
+    @media (max-width:480px){.card{padding:32px 24px}h1{font-size:24px}.icon-wrap{width:84px;height:84px}.icon-wrap svg{width:44px;height:44px}}
+  </style>
+</head>
+<body>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="container">
+    <div class="card">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+      </div>
+      <h1>账号已被封禁</h1>
+      <p class="sub">您的账号因违反平台规则已被管理员暂时或永久封禁</p>
+      <div class="user-box">👤 被封禁账号：<strong><%= username || '未知用户' %></strong></div>
+      <div class="reasons">
+        <h3>📋 常见封禁原因</h3>
+        <ul>
+          <li>发布恶意代码、病毒链接或进行网络攻击演练</li>
+          <li>恶意举报或多次提交虚假举报信息</li>
+          <li>骚扰、辱骂其他用户或发表仇恨/歧视言论</li>
+          <li>欺诈行为：虚假商品、价格欺诈、冒充他人</li>
+          <li>账号信誉分过低（严重违规行为累计扣分）</li>
+          <li>其他违反平台《用户协议》的行为</li>
+        </ul>
+      </div>
+      <div class="contact">
+        💬 <strong>申诉与咨询：</strong> 如您认为账号被误封或希望申请解封，请联系平台管理员提交申诉。申诉时请详细说明情况并提供账号相关信息。
+        <br>• 管理员会在审核后重新评估账号状态
+        <br>• 轻微违规首次申诉有机会被解封
+        <br>• 严重违规账号将维持封禁状态
+      </div>
+      <a href="/login" class="btn">🔒 返回登录页面</a>
+    </div>
+    <div class="footer">© Security Practice Mall · Account Restricted</div>
+  </div>
+</body>
+</html>

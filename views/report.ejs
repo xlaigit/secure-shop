@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>提交举报 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;min-height:100vh;background:linear-gradient(135deg,#fef2f2 0%,#fff7ed 50%,#fffbeb 100%);padding:24px;display:flex;align-items:flex-start;justify-content:center}
+    .container{width:100%;max-width:600px}
+    .nav{margin-bottom:20px;font-size:14px;color:#6b7280}
+    .nav a{color:#dc2626;text-decoration:none;font-weight:500}
+    .nav a:hover{text-decoration:underline}
+    .card{background:white;border-radius:20px;padding:36px;box-shadow:0 10px 30px rgba(220,38,38,0.1),0 1px 3px rgba(0,0,0,0.08)}
+    .header{display:flex;align-items:center;gap:14px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #f3f4f6}
+    .icon{width:52px;height:52px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(239,68,68,0.3)}
+    .icon svg{width:26px;height:26px;color:white}
+    .title h1{font-size:22px;color:#1f2937;font-weight:700;letter-spacing:-0.3px}
+    .title p{font-size:13.5px;color:#6b7280;margin-top:4px}
+    .target{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;margin-bottom:20px;font-size:14px;color:#7f1d1d}
+    .target strong{color:#991b1b}
+    .msg{border-radius:12px;padding:12px 14px;margin-bottom:18px;font-size:14px}
+    .msg.success{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+    .msg.error{background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d}
+    .form-group{margin-bottom:18px}
+    .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px}
+    .form-group input,.form-group select,.form-group textarea{width:100%;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;font-size:14.5px;color:#1f2937;background:#f9fafb;transition:all 0.15s;font-family:inherit}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#ef4444;background:white;box-shadow:0 0 0 4px rgba(239,68,68,0.1)}
+    .form-group textarea{resize:vertical;min-height:90px;line-height:1.5}
+    .reasons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+    .reason{display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;font-size:13.5px;color:#374151;background:#f9fafb;transition:all 0.15s}
+    .reason:hover{border-color:#fca5a5;background:#fef2f2}
+    .reason input[type=radio]{margin:0;accent-color:#ef4444}
+    .btn{width:100%;padding:13px;border:none;border-radius:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.15s;letter-spacing:0.3px;box-shadow:0 6px 16px rgba(239,68,68,0.28)}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(239,68,68,0.38)}
+    .btn:active{transform:translateY(0)}
+    .notice{margin-top:16px;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#78350f;line-height:1.55}
+    @media (max-width:500px){.card{padding:24px}.reasons{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav"><a href="/shop">← 返回商城</a></div>
+    <div class="card">
+      <div class="header">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </div>
+        <div class="title">
+          <h1>提交举报</h1>
+          <p>您的举报将由管理员核实处理，请勿滥用此功能</p>
+        </div>
+      </div>
+
+      <% if (msg) { %>
+        <div class="msg <%= msg.indexOf('成功') > -1 ? 'success' : 'error' %>"><%= msg %></div>
+      <% } %>
+
+      <div class="target">
+        🎯 <strong>举报对象：</strong><%= targetType === 'product' ? '商品' : targetType === 'user' ? '用户' : targetType === 'message' ? '聊天消息' : targetType === 'file' ? '共享文件' : targetType === 'chat' ? '聊天室' : '内容' %> · <%= targetName || '未指定' %>
+      </div>
+
+      <form method="POST" action="/report">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="target_type" value="<%= targetType %>">
+        <input type="hidden" name="target_id" value="<%= targetId %>">
+        <input type="hidden" name="target_name" value="<%= targetName %>">
+
+        <div class="form-group">
+          <label>举报原因 <span style="color:#ef4444">*</span></label>
+          <div class="reasons">
+            <label class="reason"><input type="radio" name="reason" value="spam" required> 垃圾信息/广告</label>
+            <label class="reason"><input type="radio" name="reason" value="harass"> 骚扰/辱骂</label>
+            <label class="reason"><input type="radio" name="reason" value="fraud"> 欺诈/诈骗</label>
+            <label class="reason"><input type="radio" name="reason" value="illegal"> 违法违规内容</label>
+            <label class="reason"><input type="radio" name="reason" value="malware"> 恶意文件/病毒</label>
+            <label class="reason"><input type="radio" name="reason" value="fake"> 虚假商品/信息</label>
+            <label class="reason"><input type="radio" name="reason" value="hate"> 仇恨言论/歧视</label>
+            <label class="reason"><input type="radio" name="reason" value="other"> 其他问题</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>详细说明 <span style="color:#6b7280;font-weight:normal">（可选，有助于我们判断）</span></label>
+          <textarea name="description" placeholder="请简要描述你遇到的问题，例如：该商品宣传与实际不符，存在价格欺诈..."></textarea>
+        </div>
+
+        <button type="submit" class="btn">🚩 提交举报</button>
+
+        <div class="notice">
+          ⚠️ 恶意举报或虚假举报将被严肃处理，可能导致账号信誉分扣除或封禁。请确认举报内容属实后再提交。
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

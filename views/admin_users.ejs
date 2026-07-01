@@ -1,42 +1,191 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>后台管理</title></head>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>用户管理 · 后台管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
+    .topbar{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .topbar .left{display:flex;align-items:center;gap:12px}
+    .topbar .logo{width:38px;height:38px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .topbar .logo svg{width:20px;height:20px;color:white}
+    .topbar .title{font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .topbar .title small{display:block;font-size:12px;color:#6b7280;font-weight:500;margin-top:2px}
+    .topbar nav{display:flex;flex-wrap:wrap;gap:4px}
+    .topbar nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .topbar nav a:hover{background:#f3f4f6;color:#667eea}
+    .topbar nav a.active{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+    .topbar nav a.danger{color:#dc2626}
+    .topbar nav a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1200px;margin:0 auto;padding:24px 28px}
+    .page-title{font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+    .page-desc{color:#6b7280;font-size:13.5px;margin-bottom:18px}
+    .table-wrap{background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:14px 16px;text-align:left;font-size:12.5px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e5e7eb}
+    td{padding:14px 16px;font-size:14px;border-bottom:1px solid #f3f4f6;color:#374151}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#f9fafb}
+    .username{display:flex;align-items:center;gap:10px;font-weight:600;color:#111827}
+    .avatar{width:32px;height:32px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:8px;color:white;font-size:13px;display:flex;align-items:center;justify-content:center;font-weight:700}
+    .role{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:600}
+    .role.admin{background:#fef3c7;color:#92400e}
+    .role.user{background:#dbeafe;color:#1e40af}
+    .status{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:600}
+    .status.normal{background:#d1fae5;color:#065f46}
+    .status.banned{background:#fee2e2;color:#991b1b}
+    .status.warning{background:#fef3c7;color:#92400e}
+    .reputation{font-weight:700;color:#059669}
+    .reputation.low{color:#dc2626}
+    .reputation.mid{color:#f59e0b}
+    .balance{font-weight:700;color:#2563eb}
+    .balance-input{width:95px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:inherit}
+    .balance-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+    .btn{padding:7px 12px;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin:2px}
+    .btn-primary{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(59,130,246,0.3)}
+    .btn-danger{background:#fee2e2;color:#991b1b}
+    .btn-danger:hover{background:#fecaca}
+    .btn-success{background:#d1fae5;color:#065f46}
+    .btn-success:hover{background:#a7f3d0}
+    .btn-warn{background:#fef3c7;color:#92400e}
+    .btn-warn:hover{background:#fde68a}
+    .btn-gray{background:#f3f4f6;color:#4b5563}
+    .btn-gray:hover{background:#e5e7eb}
+    .btn-delete{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+    .btn-delete:hover{background:#fee2e2}
+    .empty{padding:60px 28px;text-align:center;color:#6b7280}
+    .empty h3{font-size:18px;font-weight:600;margin-bottom:8px;color:#1f2937}
+    @media (max-width:900px){th,td{padding:10px 8px;font-size:12.5px}.hide-mobile{display:none}}
+  </style>
+</head>
 <body>
-  <div style="margin-bottom:10px">
-    管理员：<%= user.username %>
-    | <a href="/admin/dashboard">控制台</a>
-    | <a href="/admin/products">商品管理</a>
-    | <a href="/admin/users">用户管理</a>
-    | <a href="/admin/orders">订单管理</a>
-    | <a href="/admin/logout">退出</a>
+  <div class="topbar">
+    <div class="left">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      </div>
+      <div class="title">用户管理<small>Manage Users · Admin Panel</small></div>
+    </div>
+    <nav>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/reports">🚩 举报</a>
+      <a class="active" href="/admin/users">👥 用户</a>
+      <a href="/admin/products">📦 商品</a>
+      <a href="/admin/orders">📋 订单</a>
+      <a class="danger" href="/admin/logout">退出</a>
+    </nav>
   </div>
-  <hr>
-  <h2>用户管理</h2>
-  <table border="1" cellpadding="5">
-    <tr><th>ID</th><th>用户名</th><th>余额</th><th>角色</th><th>改余额</th><th>注销</th></tr>
-    <% users.forEach(u => { %>
-      <tr>
-        <td><%= u.id %></td>
-        <td><%= u.username %></td>
-        <td>¥<%= u.balance %></td>
-        <td><%= u.is_admin ? '管理员' : '用户' %></td>
-        <td>
-          <form action="/admin/users/balance/<%= u.id %>" method="POST">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="number" name="balance" value="<%= u.balance %>" step="0.01" style="width:80px">
-            <button type="submit">修改</button>
-          </form>
-        </td>
-        <td>
-          <% if (!u.is_admin) { %>
-            <form action="/admin/users/delete/<%= u.id %>" method="POST">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button type="submit" onclick="return confirm('确认注销？')">注销</button>
-            </form>
-          <% } else { %>-<% } %>
-        </td>
-      </tr>
-    <% }) %>
-  </table>
+
+  <div class="container">
+    <h1 class="page-title">👥 平台用户列表</h1>
+    <p class="page-desc">共 <%= users.length %> 位用户，您可以封禁、解禁、调整余额与信誉分，也可以解除用户的警告状态</p>
+
+    <div class="table-wrap">
+      <% if (users.length === 0) { %>
+        <div class="empty">
+          <h3>📭 暂无用户</h3>
+          <p>平台还没有注册用户</p>
+        </div>
+      <% } else { %>
+        <table>
+          <thead>
+            <tr>
+              <th>用户名</th>
+              <th>角色</th>
+              <th>余额</th>
+              <th>信誉分</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u) { %>
+              <tr>
+                <td>
+                  <span class="username">
+                    <span class="avatar"><%= u.username.charAt(0).toUpperCase() %></span>
+                    <%= u.username %>
+                  </span>
+                </td>
+                <td><span class="role <%= u.is_admin ? 'admin' : 'user' %>"><%= u.is_admin ? '🛡️ 管理员' : '👤 普通用户' %></span></td>
+                <td>
+                  <% if (!u.is_admin) { %>
+                    <form action="/admin/users/balance/<%= u.id %>" method="POST" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      ¥<input type="number" class="balance-input" step="0.01" min="0" name="balance" value="<%= u.balance %>">
+                      <button type="submit" class="btn btn-primary">更新</button>
+                    </form>
+                  <% } else { %>
+                    <span style="color:#9ca3af">—</span>
+                  <% } %>
+                </td>
+                <td><span class="reputation <%= u.reputation <= 40 ? 'low' : (u.reputation <= 70 ? 'mid' : '') %>"><%= u.reputation %></span></td>
+                <td>
+                  <% if (u.is_banned) { %>
+                    <span class="status banned">🚫 已封禁</span>
+                  <% } else if (u.warning_until) { %>
+                    <span class="status warning">⚠️ 警告中</span>
+                  <% } else { %>
+                    <span class="status normal">✓ 正常</span>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (!u.is_admin) { %>
+                    <% if (u.is_banned) { %>
+                      <form action="/admin/users/unban/<%= u.id %>" method="POST" style="display:inline">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-success">解除封禁</button>
+                      </form>
+                      <form action="/admin/users/warn/<%= u.id %>" method="POST" style="display:inline;margin-left:4px">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="number" name="minutes" value="10" style="width:50px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12.5px" min="1"> 分钟
+                        <button type="submit" class="btn btn-warning" onclick="return confirm('确认警告该用户？')">⚠️ 警告</button>
+                      </form>
+                    <% } else { %>
+                      <div style="display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;margin-right:4px">
+                        <select name="minutes" form="ban-form-<%= u.id %>" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12.5px;background:white">
+                          <option value="0">永久</option>
+                          <option value="10">10分钟</option>
+                          <option value="30">30分钟</option>
+                          <option value="60">1小时</option>
+                          <option value="360">6小时</option>
+                          <option value="1440">1天</option>
+                          <option value="4320">3天</option>
+                          <option value="10080">7天</option>
+                        </select>
+                        <form id="ban-form-<%= u.id %>" action="/admin/users/ban/<%= u.id %>" method="POST" style="display:inline" onsubmit="return confirm('确认封禁该用户？将扣除20信誉分！')">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button type="submit" class="btn btn-danger">🚫 封禁</button>
+                        </form>
+                      </div>
+                    <% } %>
+                    <% if (u.warning_until) { %>
+                      <form action="/admin/users/clear-warning/<%= u.id %>" method="POST" style="display:inline">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-warn">解除警告</button>
+                      </form>
+                    <% } %>
+                    <form action="/admin/users/restore-reputation/<%= u.id %>" method="POST" style="display:inline">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn-gray">+20 信誉</button>
+                    </form>
+                    <form action="/admin/users/delete/<%= u.id %>" method="POST" style="display:inline" onsubmit="return confirm('确认注销该用户账号？此操作不可撤销！')">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn-delete">注销</button>
+                    </form>
+                  <% } else { %>
+                    <span style="color:#9ca3af;font-size:12.5px">— 管理员账号 —</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
 </body>
 </html>

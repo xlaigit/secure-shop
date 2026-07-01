@@ -1,0 +1,140 @@
+<!-- 文件: views/reviews.ejs -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= product.name %> - 商品评价</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .nav a:hover{background:#f3f4f6;color:#667eea}
+    .nav a.back{color:#667eea;font-weight:600}
+    .nav a.back:hover{background:#eef2ff}
+    .container{max-width:900px;margin:0 auto;padding:24px 28px}
+    .product-card{background:white;border-radius:20px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,0.06);margin-bottom:24px;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+    .product-card .icon{width:64px;height:64px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;color:white;flex-shrink:0}
+    .product-card .info{flex:1}
+    .product-card h1{font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px}
+    .product-card .meta{color:#6b7280;font-size:14px;margin-bottom:4px}
+    .product-card .price{font-size:22px;font-weight:700;color:#667eea;margin-top:8px}
+    .product-card .price::before{content:'¥';font-size:16px;margin-right:2px}
+    .section-title{font-size:18px;font-weight:700;margin:24px 0 16px;display:flex;align-items:center;gap:8px}
+    .section-title::before{content:'';width:4px;height:18px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:2px}
+    .review-form{background:white;border-radius:20px;padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.04);margin-bottom:24px}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-weight:600;margin-bottom:6px;color:#374151;font-size:14px}
+    .star-rating{display:flex;gap:8px;font-size:28px;cursor:pointer}
+    .star-rating span{color:#d1d5db;transition:color 0.15s}
+    .star-rating span.active{color:#f59e0b}
+    .star-rating span:hover{color:#fbbf24}
+    textarea{width:100%;padding:14px;border:2px solid #e5e7eb;border-radius:12px;font-family:inherit;font-size:14px;resize:vertical;min-height:120px;transition:border-color 0.2s}
+    textarea:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,0.1)}
+    .btn-submit{width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;margin-top:8px}
+    .btn-submit:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(102,126,234,0.3)}
+    .btn-submit:disabled{opacity:0.6;cursor:not-allowed;transform:none;box-shadow:none}
+    .review-list{display:flex;flex-direction:column;gap:16px}
+    .review-item{background:white;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+    .review-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .reviewer{font-weight:600;color:#1f2937;font-size:15px}
+    .stars-display{color:#f59e0b;font-size:16px;letter-spacing:2px}
+    .review-comment{color:#4b5563;font-size:14px;line-height:1.6;margin-top:8px}
+    .review-time{font-size:12px;color:#9ca3af;margin-top:10px}
+    .empty-state{text-align:center;padding:40px;background:white;border-radius:20px;color:#6b7280}
+    .empty-state .ico{font-size:48px;margin-bottom:12px}
+    .empty-state h3{font-size:18px;font-weight:600;margin-bottom:6px;color:#1f2937}
+    .alert{background:#fef2f2;color:#991b1b;padding:14px 18px;border-radius:12px;margin-bottom:16px;border:1px solid #fecaca;font-size:14px}
+    @media (max-width:640px){
+      .product-card{flex-direction:column;align-items:flex-start}
+      .star-rating{font-size:24px}
+    }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/shop" class="back">← 返回商城</a>
+    <a href="/orders">我的订单</a>
+    <a href="/chat">群聊</a>
+    <a href="/logout">退出</a>
+  </div>
+
+  <div class="container">
+    <!-- 商品信息卡片 -->
+    <div class="product-card">
+      <div class="icon">📦</div>
+      <div class="info">
+        <h1><%= product.name %></h1>
+        <div class="meta"><%= product.shop_id ? '商家商品' : '官方正品' %> | 库存: <%= product.stock %></div>
+        <div class="price"><%= product.price %></div>
+      </div>
+    </div>
+
+    <!-- 发表评价表单 -->
+    <div class="review-form">
+      <h2 class="section-title">✍️ 发表评价</h2>
+      <form method="POST" action="/review/<%= product.id %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group">
+          <label>评分</label>
+          <div class="star-rating" id="starRating">
+            <span data-value="1">★</span>
+            <span data-value="2">★</span>
+            <span data-value="3">★</span>
+            <span data-value="4">★</span>
+            <span data-value="5">★</span>
+          </div>
+          <input type="hidden" name="rating" id="ratingInput" value="5">
+        </div>
+        <div class="form-group">
+          <label>评价内容</label>
+          <textarea name="comment" placeholder="分享你的使用体验..." required></textarea>
+        </div>
+        <button type="submit" class="btn-submit">提交评价</button>
+      </form>
+    </div>
+
+    <!-- 已有评价列表 -->
+    <h2 class="section-title">📝 用户评价 (<%= reviews.length %>)</h2>
+    <% if (reviews.length === 0) { %>
+      <div class="empty-state">
+        <div class="ico">💬</div>
+        <h3>暂无评价</h3>
+        <p>成为第一个评价此商品的人吧！</p>
+      </div>
+    <% } else { %>
+      <div class="review-list">
+        <% reviews.forEach(function(r) { %>
+          <div class="review-item">
+            <div class="review-header">
+              <span class="reviewer">👤 <%= r.username %></span>
+              <span class="stars-display"><%= '★'.repeat(r.rating) %><%= '☆'.repeat(5 - r.rating) %></span>
+            </div>
+            <div class="review-comment"><%= r.comment %></div>
+            <div class="review-time"><%= r.created_at %></div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <script>
+    // 星级评分交互
+    const stars = document.querySelectorAll('#starRating span');
+    const ratingInput = document.getElementById('ratingInput');
+    stars.forEach(star => {
+      star.addEventListener('click', function() {
+        const value = this.dataset.value;
+        ratingInput.value = value;
+        stars.forEach(s => {
+          s.classList.toggle('active', s.dataset.value <= value);
+        });
+      });
+    });
+    // 默认选中5星
+    stars.forEach(s => s.classList.add('active'));
+  </script>
+</body>
+</html>

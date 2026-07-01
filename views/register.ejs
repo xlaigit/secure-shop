@@ -1,20 +1,105 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>安全练习商城</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>注册 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f093fb 0%,#764ba2 50%,#667eea 100%);background-size:400% 400%;animation:gradient 15s ease infinite;overflow:hidden;position:relative}
+    @keyframes gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+    body::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(255,255,255,0.1),transparent 40%),radial-gradient(circle at 20% 80%,rgba(255,255,255,0.1),transparent 40%);pointer-events:none}
+    .bubble{position:absolute;border-radius:50%;background:rgba(255,255,255,0.08);animation:float 20s infinite linear;pointer-events:none}
+    .bubble:nth-child(1){width:260px;height:260px;top:-80px;right:-80px;animation-duration:22s}
+    .bubble:nth-child(2){width:220px;height:220px;bottom:-60px;left:-60px;animation-duration:28s;animation-delay:-4s}
+    .bubble:nth-child(3){width:140px;height:140px;top:40%;left:15%;animation-duration:18s;animation-delay:-8s}
+    @keyframes float{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(-40px,-60px) rotate(360deg)}}
+    .container{position:relative;z-index:1;width:100%;max-width:480px;padding:24px;animation:fadeIn 0.6s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .card{background:rgba(255,255,255,0.98);border-radius:24px;padding:38px 36px;box-shadow:0 25px 50px rgba(0,0,0,0.25),0 0 0 1px rgba(255,255,255,0.5) inset}
+    .logo{text-align:center;margin-bottom:24px}
+    .logo-icon{width:64px;height:64px;margin:0 auto 12px;background:linear-gradient(135deg,#f093fb,#764ba2);border-radius:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 25px rgba(118,75,162,0.4);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+    .logo-icon svg{width:32px;height:32px;color:white}
+    .logo h1{font-size:26px;font-weight:700;color:#1f2937;letter-spacing:-0.5px}
+    .logo p{color:#6b7280;font-size:14px;margin-top:6px}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px}
+    .input-wrap{position:relative;display:flex;align-items:center}
+    .input-wrap svg{position:absolute;left:14px;width:18px;height:18px;color:#9ca3af;pointer-events:none}
+    .input-wrap input{width:100%;padding:13px 14px 13px 44px;border:2px solid #e5e7eb;border-radius:12px;font-size:15px;color:#1f2937;background:#f9fafb;transition:all 0.2s;font-family:inherit}
+    .input-wrap input:focus{outline:none;border-color:#764ba2;background:white;box-shadow:0 0 0 4px rgba(118,75,162,0.12)}
+    .captcha-row{display:flex;gap:10px;align-items:stretch}
+    .captcha-row .input-wrap{flex:1}
+    .captcha-img{height:46px;border:2px solid #e5e7eb;border-radius:12px;cursor:pointer;background:#fff;padding:0 8px;display:flex;align-items:center;transition:all 0.2s}
+    .captcha-img:hover{border-color:#764ba2;box-shadow:0 0 0 4px rgba(118,75,162,0.12)}
+    .btn{width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#f093fb,#764ba2);color:white;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s;letter-spacing:0.3px;box-shadow:0 8px 20px rgba(240,147,251,0.35)}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(118,75,162,0.45)}
+    .btn:active{transform:translateY(0)}
+    .divider{display:flex;align-items:center;margin:18px 0 14px;color:#9ca3af;font-size:12px}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e5e7eb}
+    .divider span{padding:0 12px}
+    .links{text-align:center;font-size:14px;color:#6b7280}
+    .links a{color:#764ba2;text-decoration:none;font-weight:600;transition:color 0.2s}
+    .links a:hover{color:#667eea;text-decoration:underline}
+    .footer{text-align:center;margin-top:20px;color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,0.2)}
+    .tip{background:rgba(118,75,162,0.08);border:1px solid rgba(118,75,162,0.15);border-radius:12px;padding:11px 13px;margin:12px 0 0;font-size:12.5px;color:#4b5563;line-height:1.55}
+    .tip strong{color:#764ba2}
+    @media (max-width:480px){.card{padding:30px 22px}.logo h1{font-size:22px}}
+  </style>
 </head>
 <body>
-  <div style="margin-bottom:10px">
-    <a href="/login">登录</a> | <a href="/register">注册</a>
+  <div class="bubble"></div>
+  <div class="bubble"></div>
+  <div class="bubble"></div>
+  <div class="container">
+    <div class="card">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
+          </svg>
+        </div>
+        <h1>创建新账号</h1>
+        <p>加入安全练习商城，开启你的学习旅程</p>
+      </div>
+      <form method="POST" action="/register">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group">
+          <label>用户名</label>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input name="username" placeholder="3-20位字母或数字" required minlength="3" maxlength="20" pattern="[A-Za-z0-9]+" autocomplete="username">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" name="password" placeholder="至少6位" required minlength="6" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>验证码</label>
+          <div class="captcha-row">
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <!-- 当前代码 -->
+<input name="captcha" placeholder="输入验证码" required maxlength="4" style="text-transform:uppercase">
+            </div>
+            <img src="/captcha" onclick="this.src='/captcha?'+Date.now()" class="captcha-img" title="点击刷新验证码">
+          </div>
+        </div>
+        <button type="submit" class="btn">注 册 账 号</button>
+        <div class="tip">🎁 注册即送 <strong>100元</strong> 初始余额，可用于购买体验商品</div>
+      </form>
+      <div class="divider"><span>已有账号</span></div>
+      <div class="links">
+        已注册？<a href="/login">立即登录</a> · <a href="/admin/login">管理员通道</a>
+      </div>
+    </div>
+    <div class="footer">© 安全练习商城 · 仅供学习交流使用</div>
   </div>
-  <hr>
-  <h2>注册</h2>
-  <form method="POST" action="/register">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <label>用户名：<input name="username" required></label><br>
-    <label>密码：<input type="password" name="password" required></label><br>
-    <button type="submit">注册</button>
-  </form>
 </body>
 </html>

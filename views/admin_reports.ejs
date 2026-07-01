@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>举报管理 · 后台管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
+    .topbar{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .topbar .left{display:flex;align-items:center;gap:12px}
+    .topbar .logo{width:38px;height:38px;background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .topbar .logo svg{width:20px;height:20px;color:white}
+    .topbar .title{font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .topbar .title small{display:block;font-size:12px;color:#6b7280;font-weight:500;margin-top:2px}
+    .topbar nav{display:flex;flex-wrap:wrap;gap:4px}
+    .topbar nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .topbar nav a:hover{background:#f3f4f6;color:#667eea}
+    .topbar nav a.active{background:linear-gradient(135deg,#ef4444,#dc2626);color:white;box-shadow:0 4px 12px rgba(239,68,68,0.3)}
+    .topbar nav a.danger{color:#dc2626}
+    .topbar nav a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1400px;margin:0 auto;padding:24px 28px}
+    .page-title{font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+    .page-desc{color:#6b7280;font-size:13.5px;margin-bottom:18px}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stat{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border-left:4px solid #667eea;transition:transform 0.15s}
+    .stat:hover{transform:translateY(-2px)}
+    .stat .label{font-size:12px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+    .stat .num{font-size:30px;font-weight:700;color:#1f2937;margin-top:6px;letter-spacing:-0.5px}
+    .stat.pending{border-left-color:#f59e0b}
+    .stat.pending .num{color:#92400e}
+    .stat.resolved{border-left-color:#10b981}
+    .stat.resolved .num{color:#065f46}
+    .stat.rejected{border-left-color:#ef4444}
+    .stat.rejected .num{color:#991b1b}
+    .list{background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .list-header{padding:14px 20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);font-weight:700;font-size:12.5px;color:#374151;display:grid;grid-template-columns:60px 1.3fr 1.6fr 100px 140px 260px;gap:12px;align-items:center;text-transform:uppercase;letter-spacing:0.3px}
+    .item{padding:16px 20px;border-top:1px solid #f3f4f6;display:grid;grid-template-columns:60px 1.3fr 1.6fr 100px 140px 260px;gap:12px;align-items:start;font-size:14px;transition:background 0.15s}
+    .item:hover{background:#fafafa}
+    .item .id{color:#9ca3af;font-family:monospace;font-size:13px;font-weight:600;padding-top:4px}
+    .item .target{color:#374151;line-height:1.5}
+    .item .target .name{font-weight:700;color:#111827;font-size:14.5px}
+    .item .target small{display:block;color:#6b7280;font-size:12px;margin-top:4px}
+    .item .target .user-status{margin-top:8px;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;display:inline-block}
+    .item .target .user-status.ok{background:#d1fae5;color:#065f46}
+    .item .target .user-status.banned{background:#fee2e2;color:#991b1b}
+    .item .target .user-status.warn{background:#fef3c7;color:#92400e}
+    .item .desc{color:#6b7280;font-size:13px;line-height:1.6}
+    .item .desc strong{color:#374151}
+    .item .reporter{font-size:13px;color:#374151;font-weight:500}
+    .item .time{font-size:12.5px;color:#6b7280}
+    .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;margin-bottom:8px}
+    .badge.pending{background:#fef3c7;color:#92400e}
+    .badge.resolved{background:#d1fae5;color:#065f46}
+    .badge.rejected{background:#fee2e2;color:#991b1b}
+    .actions{display:flex;flex-direction:column;gap:6px}
+    .actions-row{display:flex;flex-wrap:wrap;gap:6px}
+    .actions form{display:inline}
+    .btn{padding:6px 10px;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;transition:all 0.15s;font-family:inherit;white-space:nowrap}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,0.15)}
+    .btn-resolve{background:#10b981;color:white}
+    .btn-resolve:hover{background:#059669}
+    .btn-reject{background:#6b7280;color:white}
+    .btn-reject:hover{background:#4b5563}
+    .btn-ban{background:linear-gradient(135deg,#dc2626,#991b1b);color:white}
+    .btn-penalty{background:linear-gradient(135deg,#f59e0b,#d97706);color:white}
+    .btn-warn{background:linear-gradient(135deg,#eab308,#ca8a04);color:white}
+    .btn-delete{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:white}
+    .actions input, .actions select, .actions textarea{width:100%;padding:8px 10px;border:2px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;color:#1f2937;margin-bottom:6px;background:white;resize:vertical;transition:all 0.15s}
+    .actions input:focus, .actions select:focus, .actions textarea:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(1024,126,234,0.15)}
+    .hint{font-size:11px;color:#9ca3af;margin-top:4px;line-height:1.5}
+    .empty{padding:60px 28px;text-align:center}
+    .empty .ico{font-size:48px;margin-bottom:12px;opacity:0.4}
+    .empty h3{font-size:18px;font-weight:700;margin-bottom:6px;color:#1f2937}
+    .empty p{color:#6b7280;font-size:13.5px}
+    .type-tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;background:#e0e7ff;color:#3730a3;margin-right:6px;letter-spacing:0.3px;text-transform:uppercase}
+    .type-tag.user{background:#fef3c7;color:#92400e}
+    .type-tag.product{background:#d1fae5;color:#065f46}
+    .type-tag.message{background:#dbeafe;color:#1e40af}
+    .type-tag.file{background:#fce7f3;color:#9d174d}
+    .type-tag.chat{background:#ede9fe;color:#5b21b6}
+    .reason-tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:#f3f4f6;color:#4b5563;margin-right:6px}
+    @media (max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.list-header,.item{grid-template-columns:60px 1.3fr 220px;font-size:13px}.list-header > *:nth-child(3),.list-header > *:nth-child(4),.item > *:nth-child(3),.item > *:nth-child(4){display:none}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="left">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+      </div>
+      <div class="title">举报管理<small>Report Center · Admin Panel</small></div>
+    </div>
+    <nav>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a class="active" href="/admin/reports">🚩 举报</a>
+      <a href="/admin/users">👥 用户</a>
+      <a href="/admin/products">📦 商品</a>
+      <a href="/admin/orders">📋 订单</a>
+      <a class="danger" href="/admin/logout">退出</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <h1 class="page-title">🚩 举报管理中心</h1>
+    <p class="page-desc">查看、处理所有用户举报。可以对违规用户封禁、扣信誉、发出警告，或删除违规商品。</p>
+
+    <% 
+      let total = reports.length;
+      let pending = reports.filter(r => r.status === 'pending').length;
+      let resolved = reports.filter(r => r.status === 'resolved').length;
+      let rejected = reports.filter(r => r.status === 'rejected').length;
+    %>
+    <div class="stats">
+      <div class="stat"><div class="label">总举报数</div><div class="num"><%= total %></div></div>
+      <div class="stat pending"><div class="label">待处理</div><div class="num"><%= pending %></div></div>
+      <div class="stat resolved"><div class="label">已处理</div><div class="num"><%= resolved %></div></div>
+      <div class="stat rejected"><div class="label">已驳回</div><div class="num"><%= rejected %></div></div>
+    </div>
+
+    <div class="list">
+      <div class="list-header">
+        <div>ID</div>
+        <div>举报对象</div>
+        <div>原因与描述</div>
+        <div>举报人</div>
+        <div>时间</div>
+        <div>状态 / 操作</div>
+      </div>
+      <% if (reports.length === 0) { %>
+        <div class="empty">
+          <div class="ico">🎉</div>
+          <h3>暂无举报记录</h3>
+          <p>平台目前一切安好，没有需要处理的举报。</p>
+        </div>
+      <% } else { %>
+        <% reports.forEach(function(r) { %>
+          <div class="item">
+            <div class="id">#<%= r.id %></div>
+            <div class="target">
+              <span class="type-tag <%= r.target_type === 'product' || r.target_type === '商品' ? 'product' : r.target_type === 'user' || r.target_type === '用户' ? 'user' : r.target_type === 'message' || r.target_type === '消息' ? 'message' : r.target_type === 'file' || r.target_type === '文件' ? 'file' : r.target_type === 'chat' || r.target_type === '聊天' ? 'chat' : '' %>"><%= r.target_type %></span>
+              <div class="name"><%= r.target_name || '未命名' %></div>
+              <small>目标标识: <%= r.target_id %></small>
+              <% if (r.target_type === 'user' && r._reportedUser) { %>
+                <div class="user-status <%= r._reportedUser.is_banned ? 'banned' : r._reportedUser.warning_until ? 'warn' : 'ok' %>">
+                  <%= r._reportedUser.is_banned ? '🚫 已封禁' : r._reportedUser.warning_until ? '⚠️ 警告中' : '✓ 正常账号' %> · 信誉分: <%= r._reportedUser.reputation %>
+                </div>
+              <% } %>
+            </div>
+            <div class="desc">
+              <div><span class="reason-tag"><%= r.reason %></span></div>
+              <% if (r.description) { %><div style="margin-top:6px;"><%= r.description %></div><% } %>
+            </div>
+            <div class="reporter"><%= r.reporter_name %></div>
+            <div class="time"><%= r.created_at %></div>
+            <div class="actions">
+              <div class="badge <%= r.status === 'resolved' ? 'resolved' : r.status === 'rejected' ? 'rejected' : 'pending' %>"><%= r.status === 'resolved' ? '已处理' : r.status === 'rejected' ? '已驳回' : '待处理' %></div>
+              <% if (r.status !== 'resolved' && r.status !== 'rejected') { %>
+                <div class="actions-row" style="flex-direction:column;align-items:stretch;width:100%;margin-top:4px">
+                  <textarea name="note" placeholder="💭 处理理由（将邮件通知玩家）" form="form-ban-<%= r.id %>" style="min-height:56px"></textarea>
+                  <select name="banDuration" form="form-ban-<%= r.id %>">
+                    <option value="0">⏱️ 永久封禁</option>
+                    <option value="10">10 分钟</option>
+                    <option value="30">30 分钟</option>
+                    <option value="60">1 小时</option>
+                    <option value="360">6 小时</option>
+                    <option value="1440">24 小时</option>
+                    <option value="4320">3 天</option>
+                    <option value="10080">7 天</option>
+                  </select>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px">
+                    <% if (r.target_type === 'user' || r.target_type === '用户') { %>
+                      <form id="form-ban-<%= r.id %>" method="POST" action="/admin/reports/<%= r.id %>/action/ban-user" onsubmit="return confirm('确认封禁该用户？理由将通过邮件发送。')">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-ban">🚫 封禁</button>
+                      </form>
+                      <form method="POST" action="/admin/reports/<%= r.id %>/action/warn-user" onsubmit="return confirm('确认向该用户发出警告？')">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="hidden" name="note" value="">
+                        <button type="submit" class="btn btn-warn">⚠️ 警告</button>
+                      </form>
+                      <form method="POST" action="/admin/reports/<%= r.id %>/action/penalty-user" onsubmit="return confirm('确认扣除该用户信誉分？')">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="hidden" name="note" value="">
+                        <button type="submit" class="btn btn-penalty">💢 扣信誉</button>
+                      </form>
+                    <% } %>
+                    <% if (r.target_type === 'product' || r.target_type === '商品') { %>
+                      <form method="POST" action="/admin/reports/<%= r.id %>/action/delete-product" onsubmit="return confirm('确认删除该商品？')">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="hidden" name="note" value="">
+                        <button type="submit" class="btn btn-delete">🗑️ 删除</button>
+                      </form>
+                    <% } %>
+                    <form method="POST" action="/admin/reports/<%= r.id %>/resolve">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="note" value="">
+                      <button type="submit" class="btn btn-resolve">✓ 处理</button>
+                    </form>
+                    <form method="POST" action="/admin/reports/<%= r.id %>/reject">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="note" value="">
+                      <button type="submit" class="btn btn-reject">✗ 驳回</button>
+                    </form>
+                  </div>
+                </div>
+              <% } else { %>
+                <div class="hint">✓ 该举报已处理完毕</div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

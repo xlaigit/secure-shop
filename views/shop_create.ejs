@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>创建店铺</title></head>
+<body>
+  <div><a href="/shop">返回商城</a> | <a href="/friends">好友</a> | <a href="/chat">群聊</a> | <a href="/shop/create">开店</a></div>
+  <hr>
+  <h2>创建店铺</h2>
+  <form method="POST" action="/shop/create">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>店铺名：<input name="name" required></label><br>
+    <label>描述：<textarea name="desc"></textarea></label><br>
+    <button type="submit">创建</button>
+  </form>
+</body></html>

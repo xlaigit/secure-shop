@@ -1,0 +1,158 @@
+<!-- 文件: d:\肖宇帆\HTML项目\views\banned.ejs -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>账号已被封禁</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .container{background:white;border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.3);max-width:600px;width:100%;overflow:hidden;animation:fadeIn .6s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .header{background:linear-gradient(135deg,#ff6b6b,#ee5a5a);padding:40px 30px;text-align:center;color:white;position:relative;overflow:hidden}
+  .header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,.1) 1px,transparent 1px);background-size:30px 30px;animation:bgMove 20s linear infinite}
+  @keyframes bgMove{from{transform:translate(0,0)}to{transform:translate(30px,30px)}}
+  .icon{font-size:72px;margin-bottom:15px;animation:shake 1s ease;position:relative;z-index:1}
+  @keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-15deg)}75%{transform:rotate(15deg)}}
+  .title{font-size:28px;font-weight:bold;margin-bottom:8px;position:relative;z-index:1}
+  .subtitle{font-size:14px;opacity:.9;position:relative;z-index:1}
+  .body{padding:35px 30px}
+  .user-box{background:#fef3c7;border-left:4px solid #f59e0b;padding:15px 20px;border-radius:8px;margin-bottom:20px}
+  .user-box strong{color:#92400e}
+  .countdown{background:linear-gradient(135deg,#4facfe,#00f2fe);color:white;padding:25px;border-radius:16px;text-align:center;margin-bottom:20px;box-shadow:0 10px 30px rgba(79,172,254,.3)}
+  .countdown-label{font-size:13px;margin-bottom:10px;opacity:.95;letter-spacing:2px}
+  .countdown-time{font-size:42px;font-weight:bold;font-family:'Courier New',monospace;letter-spacing:2px;text-shadow:0 2px 10px rgba(0,0,0,.2)}
+  .countdown-perm{background:linear-gradient(135deg,#fc5c7d,#6a82fb)}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:20px}
+  .info-box{background:#f8f9fa;padding:15px;border-radius:12px;border:1px solid #e9ecef}
+  .info-box .label{font-size:11px;color:#6c757d;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+  .info-box .value{font-size:16px;color:#212529;font-weight:600;word-break:break-all}
+  .appeal-section{background:linear-gradient(135deg,#f093fb,#f5576c);color:white;padding:25px;border-radius:16px;margin-bottom:20px}
+  .appeal-section h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .appeal-section p{font-size:13px;opacity:.95;margin-bottom:15px;line-height:1.6}
+  .appeal-form textarea{width:100%;min-height:100px;padding:12px;border:none;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;margin-bottom:12px;background:rgba(255,255,255,.95);color:#333}
+  .appeal-form textarea:focus{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.3)}
+  .appeal-form select{width:100%;padding:10px;border:none;border-radius:10px;margin-bottom:10px;font-family:inherit;font-size:14px;background:rgba(255,255,255,.95);color:#333}
+  .btn-appeal{width:100%;padding:14px;background:white;color:#f5576c;border:none;border-radius:12px;font-size:16px;font-weight:bold;cursor:pointer;transition:all .2s;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+  .btn-appeal:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .btn-appeal:active{transform:translateY(0)}
+  .login-btn{width:100%;padding:13px;background:#667eea;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none;display:block;text-align:center}
+  .login-btn:hover{background:#5568d3}
+  .footer{text-align:center;padding:20px 30px;background:#f8f9fa;border-top:1px solid #e9ecef;color:#6c757d;font-size:12px}
+  .success-msg{background:#d4edda;color:#155724;padding:12px 18px;border-radius:10px;margin-bottom:15px;text-align:center;font-size:14px}
+  .rules{background:#fff5f5;border:1px solid #fecaca;padding:18px;border-radius:12px;margin-bottom:20px}
+  .rules h4{color:#991b1b;margin-bottom:10px;font-size:14px}
+  .rules ul{font-size:13px;color:#7f1d1d;line-height:1.8;padding-left:18px}
+  .shop-banned{background:linear-gradient(135deg,#f59e0b,#d97706)}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header <%= typeof shopBanned !== 'undefined' && shopBanned ? 'shop-banned' : '' %>">
+      <div class="icon"><%= typeof shopBanned !== 'undefined' && shopBanned ? '🏪' : '🚫' %></div>
+      <div class="title"><%= typeof shopBanned !== 'undefined' && shopBanned ? '您的店铺已被封禁' : '账号已被封禁' %></div>
+      <div class="subtitle"><%= username %>，很抱歉通知您</div>
+    </div>
+
+    <div class="body">
+      <% if (typeof msg !== 'undefined' && msg) { %><div class="success-msg"><%= msg %></div><% } %>
+
+      <div class="user-box">
+        ⚠️ 您的账号因违反平台规则已被限制访问。请查看下方封禁详情，如认为是误判可通过申诉功能提交申请。
+      </div>
+
+      <% if (banUntil) { %>
+        <div class="countdown" id="countdownBox">
+          <div class="countdown-label">⏱️ 剩余封禁时间</div>
+          <div class="countdown-time" id="countdownTime">计算中...</div>
+        </div>
+      <% } else { %>
+        <div class="countdown countdown-perm">
+          <div class="countdown-label">🚫 封禁状态</div>
+          <div class="countdown-time" style="font-size:28px">永久封禁</div>
+        </div>
+      <% } %>
+
+      <div class="info-grid">
+        <div class="info-box">
+          <div class="label">👤 账号</div>
+          <div class="value"><%= username %></div>
+        </div>
+        <div class="info-box">
+          <div class="label">📅 状态</div>
+          <div class="value"><%= banUntil ? '临时封禁' : '永久封禁' %></div>
+        </div>
+        <% if (banUntil) { %>
+        <div class="info-box" style="grid-column:span 2">
+          <div class="label">🔓 预计自动解封时间</div>
+          <div class="value" id="banUntilDisplay"><%= banUntil %></div>
+        </div>
+        <% } %>
+      </div>
+
+      <div class="rules">
+        <h4>📜 封禁期间的限制</h4>
+        <ul>
+          <li>无法登录和使用商城功能</li>
+          <li>无法发布商品、评价或进行交易</li>
+          <li>您的店铺和商品将不在首页展示</li>
+          <li>临时封禁到期后会自动解封</li>
+          <li>永久封禁需通过申诉由管理员审核</li>
+        </ul>
+      </div>
+
+      <div class="appeal-section">
+        <h3>📝 提交申诉</h3>
+        <p>如果您认为此封禁是错误的，或希望解释相关情况，可以在此填写申诉内容，管理员会在审核后与您联系。</p>
+        <form action="/appeal" method="post" class="appeal-form">
+          <input type="hidden" name="username" value="<%= username %>" />
+          <select name="appeal_type">
+            <option value="ban">账号封禁申诉</option>
+            <option value="shop">店铺封禁申诉</option>
+            <option value="warning">警告申诉</option>
+            <option value="other">其他申诉</option>
+          </select>
+          <textarea name="content" placeholder="请详细说明您的申诉理由...（至少5个字符）"></textarea>
+          <button type="submit" class="btn-appeal">✉️ 提交申诉</button>
+        </form>
+      </div>
+
+      <a href="/login" class="login-btn">← 返回登录页</a>
+    </div>
+
+    <div class="footer">
+      © 2026 平台安全中心 · 遵守社区规则，共创良好环境
+    </div>
+  </div>
+
+  <% if (banUntil) { %>
+  <script>
+    (function() {
+      var banUntil = new Date('<%= banUntil %>').getTime();
+      var el = document.getElementById('countdownTime');
+      var display = document.getElementById('banUntilDisplay');
+      if (display) {
+        var d = new Date('<%= banUntil %>');
+        display.textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+      }
+      function update() {
+        var now = Date.now();
+        var diff = Math.max(0, banUntil - now);
+        var days = Math.floor(diff / 86400000);
+        var hours = Math.floor((diff % 86400000) / 3600000);
+        var mins = Math.floor((diff % 3600000) / 60000);
+        var secs = Math.floor((diff % 60000) / 1000);
+        var text = '';
+        if (days > 0) text += days + '天 ';
+        text += String(hours).padStart(2,'0') + ':' + String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+        el.textContent = text;
+        if (diff <= 0) { clearInterval(timer); el.textContent = '已到期，正在刷新...'; setTimeout(() => location.reload(), 1500); }
+      }
+      update();
+      var timer = setInterval(update, 1000);
+    })();
+  </script>
+  <% } %>
+</body>
+</html>

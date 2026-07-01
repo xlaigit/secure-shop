@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的账单 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:10}
+    .nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .nav .brand-icon{width:36px;height:36px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .nav .brand-icon svg{width:18px;height:18px;color:white}
+    .nav .menu{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+    .nav .menu a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .nav .menu a:hover{background:#f3f4f6;color:#667eea}
+    .nav .menu a.active{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .nav .menu a.danger{color:#dc2626}
+    .nav .menu a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1000px;margin:0 auto;padding:24px 28px}
+    .user-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border-radius:18px;padding:22px 26px;margin-bottom:24px;box-shadow:0 10px 30px rgba(102,126,234,0.25);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+    .user-card .info h2{font-size:20px;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px}
+    .user-card .info p{font-size:13px;color:rgba(255,255,255,0.85);opacity:0.9}
+    .user-card .balance{background:rgba(255,255,255,0.18);padding:12px 22px;border-radius:14px;text-align:center;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2)}
+    .user-card .balance .label{font-size:11.5px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;font-weight:500}
+    .user-card .balance .amount{font-size:26px;font-weight:700;margin-top:2px;letter-spacing:-0.5px}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+    .stat-card{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border:2px solid transparent}
+    .stat-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,0.1);border-color:#e5e7eb}
+    .stat-icon{font-size:32px;margin-bottom:10px}
+    .stat-value{font-size:24px;font-weight:700;color:#111827;margin-bottom:4px}
+    .stat-label{font-size:13px;color:#6b7280}
+    .stat-positive{color:#10b981}
+    .stat-negative{color:#ef4444}
+    .section-header{margin-bottom:20px}
+    .section-header h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+    .section-header p{color:#6b7280;font-size:13px;margin-top:4px}
+    .transactions-list{display:flex;flex-direction:column;gap:12px}
+    .transaction-card{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border-left:4px solid #667eea;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+    .transaction-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,0.1)}
+    .transaction-card.refund{border-left-color:#10b981}
+    .transaction-info{flex:1}
+    .transaction-name{font-size:17px;font-weight:700;color:#111827;margin-bottom:4px;letter-spacing:-0.2px}
+    .transaction-meta{font-size:13px;color:#6b7280;display:flex;flex-wrap:wrap;gap:12px}
+    .transaction-amount{font-size:20px;font-weight:700;white-space:nowrap}
+    .transaction-amount.income{color:#10b981}
+    .transaction-amount.expense{color:#ef4444}
+    .transaction-status{font-size:12px;font-weight:600;padding:4px 8px;border-radius:8px;white-space:nowrap}
+    .status-completed{background:#ecfdf5;color:#065f46}
+    .status-refunding{background:#fffbeb;color:#92400e}
+    .status-refunded{background:#ecfdf5;color:#065f46}
+    .status-pending{background:#fef3c7;color:#92400e}
+    .status-approved{background:#ecfdf5;color:#065f46}
+    .status-rejected{background:#fef2f2;color:#991b1b}
+    .empty-state{text-align:center;padding:60px 20px;background:white;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .empty-state .ico{font-size:48px;margin-bottom:12px;opacity:0.5}
+    .empty-state h3{font-size:18px;font-weight:600;margin-bottom:8px;color:#1f2937}
+    .empty-state p{color:#6b7280;font-size:14px}
+    @media (max-width:640px){.transaction-card{flex-direction:column;align-items:flex-start}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <span>安全练习商城</span>
+    </div>
+    <div class="menu">
+      <a href="/shop">🛒 商城</a>
+      <a href="/orders">📋 订单</a>
+      <a class="active" href="/billing">💰 账单</a>
+      <a href="/profile">👤 头像</a>
+      <a href="/friends">👥 好友</a>
+      <a href="/chat">💬 群聊</a>
+      <a href="/shop/create">🏪 开店</a>
+      <a href="/shop/manage">📦 店铺管理</a>
+      <a class="danger" href="/logout">退出</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="user-card">
+      <div class="info">
+        <h2>👋 你好，<%= user.username %>！</h2>
+        <p>这里是你的账单记录，查看所有交易明细</p>
+      </div>
+      <div class="balance">
+        <div class="label">当前余额</div>
+        <div class="amount">¥<%= user.balance %></div>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📦</div>
+        <div class="stat-value"><%= stats.totalOrders %></div>
+        <div class="stat-label">总订单数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💸</div>
+        <div class="stat-value stat-negative">¥<%= stats.totalSpent.toFixed(2) %></div>
+        <div class="stat-label">总消费</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔄</div>
+        <div class="stat-value"><%= stats.totalRefunds %></div>
+        <div class="stat-label">退款订单</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📈</div>
+        <div class="stat-value stat-positive">¥<%= stats.refundedAmount.toFixed(2) %></div>
+        <div class="stat-label">退款金额</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h1>💰 交易记录</h1>
+      <p>共 <%= transactions.length %> 笔交易</p>
+    </div>
+
+    <% if (transactions.length === 0) { %>
+      <div class="empty-state">
+        <div class="ico">📊</div>
+        <h3>暂无交易记录</h3>
+        <p>去商城逛逛，开始你的购物之旅吧</p>
+      </div>
+    <% } else { %>
+      <div class="transactions-list">
+        <% transactions.forEach(function(t) { %>
+          <div class="transaction-card <%= t.type === 'refund' ? 'refund' : '' %>">
+            <div class="transaction-info">
+              <div class="transaction-name">
+                <%= t.type === 'order' ? '🛒 购买' : '💸 退款' %>: <%= t.product_name %>
+              </div>
+              <div class="transaction-meta">
+                <span>🕒 <%= t.time %></span>
+                <span class="transaction-status <%= 
+                  t.type === 'order' ? 
+                    t.status === 'refunded' ? 'status-refunded' : 
+                    t.status === 'refunding' ? 'status-refunding' : 'status-completed' :
+                  t.status === 'approved' ? 'status-approved' :
+                  t.status === 'rejected' ? 'status-rejected' : 'status-pending'
+                %>">
+                  <%= t.type === 'order' ? 
+                    t.status === 'refunded' ? '已退款' : 
+                    t.status === 'refunding' ? '退款中' : '已完成' :
+                  t.status === 'approved' ? '已通过' :
+                  t.status === 'rejected' ? '已驳回' : '审核中'
+                  %>
+                </span>
+              </div>
+            </div>
+            <div class="transaction-amount <%= t.type === 'refund' ? 'income' : 'expense' %>">
+              <%= t.type === 'refund' ? '+' : '-' %>¥<%= parseFloat(t.amount).toFixed(2) %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>

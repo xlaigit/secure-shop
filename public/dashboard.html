@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>📊 攻击监控</title>
+  <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{background:#0a0a0f;color:#fff;padding:15px;font-family:Arial,sans-serif}
+    .glass{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:15px;margin-bottom:12px}
+    .num{font-size:2em;font-weight:700}.red{color:#ff4757}.green{color:#00ff88}.blue{color:#70a1ff}.yellow{color:#ffa502}.purple{color:#a855f7}
+    .tag{font-size:0.7em;padding:2px 6px;border-radius:4px}
+    .tag-SQL注入{background:#ffa502}.tag-XSS{background:#ff4757}.tag-路径遍历{background:#a855f7}
+    .muted{color:#8da0bc;font-size:0.9em}
+    .small{font-size:0.9em}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="glass d-flex justify-content-between align-items-center">
+    <div>
+      <h3>📊 攻击实时监控</h3>
+      <div class="muted" id="status">正在读取最新威胁日志…</div>
+    </div>
+    <div class="muted">每 5 秒自动刷新</div>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-3"><div class="glass text-center"><div class="num red" id="total">0</div>总攻击</div></div>
+    <div class="col-3"><div class="glass text-center"><div class="num blue" id="xss">0</div>XSS</div></div>
+    <div class="col-3"><div class="glass text-center"><div class="num yellow" id="sql">0</div>SQL注入</div></div>
+    <div class="col-3"><div class="glass text-center"><div class="num purple" id="path">0</div>路径遍历</div></div>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-4"><div class="glass"><div class="small muted">独立 IP</div><div class="num green" id="ips">0</div></div></div>
+    <div class="col-4"><div class="glass"><div class="small muted">最近 1 分钟</div><div class="num" id="minute">0</div></div></div>
+    <div class="col-4"><div class="glass"><div class="small muted">最高频 IP</div><div class="num blue" id="topip">-</div></div></div>
+  </div>
+
+  <div class="glass">
+    <h5>📋 实时日志</h5>
+    <table class="table table-dark table-sm">
+      <thead><tr><th>时间</th><th>IP</th><th>类型</th><th>方法</th><th>路径</th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;');
+}
+
+async function load() {
+  const r = await fetch('/attack-log');
+  const logs = await r.json();
+  let total = 0, xss = 0, sql = 0, path = 0;
+  const ipMap = {};
+  let minute = 0;
+  const now = Date.now();
+  let html = '';
+  logs.slice().reverse().forEach(l => {
+    if (l.atk) {
+      total++;
+      if (l.atk === 'XSS') xss++;
+      if (l.atk === 'SQL注入') sql++;
+      if (l.atk === '路径遍历') path++;
+      const ip = l.ip || 'unknown';
+      ipMap[ip] = (ipMap[ip] || 0) + 1;
+      const t = new Date(l.time || '').getTime();
+      if (!Number.isNaN(t) && now - t < 60000) minute++;
+      html += `<tr style="background:rgba(255,71,87,0.15)"><td>${escapeHtml(l.time || '')}</td><td>${escapeHtml(ip)}</td><td><span class="tag tag-${escapeHtml(l.atk)}">${escapeHtml(l.atk)}</span></td><td>${escapeHtml(l.method || '')}</td><td>${escapeHtml(l.url || '')}</td></tr>`;
+    } else {
+      html += `<tr><td>${escapeHtml(l.time || '')}</td><td>${escapeHtml(l.ip || 'unknown')}</td><td>-</td><td>${escapeHtml(l.method || '')}</td><td>${escapeHtml(l.url || '')}</td></tr>`;
+    }
+  });
+  const topIp = Object.entries(ipMap).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+  document.getElementById('total').innerText = total;
+  document.getElementById('xss').innerText = xss;
+  document.getElementById('sql').innerText = sql;
+  document.getElementById('path').innerText = path;
+  document.getElementById('ips').innerText = Object.keys(ipMap).length;
+  document.getElementById('minute').innerText = minute;
+  document.getElementById('topip').innerText = topIp;
+  document.getElementById('status').innerText = `最近 ${logs.length} 条记录 · 最后更新 ${new Date().toLocaleTimeString()}`;
+  document.getElementById('logBody').innerHTML = html || '<tr><td colspan="5" class="text-center muted">暂无攻击记录</td></tr>';
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

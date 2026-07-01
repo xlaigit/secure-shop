@@ -1,0 +1,88 @@
+<!-- 文件: d:\肖宇帆\HTML项目\views\appeal.ejs -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>申诉中心</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#a8edea,#fed6e3);min-height:100vh;padding:20px}
+  .wrap{max-width:700px;margin:30px auto;background:white;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15);overflow:hidden}
+  .header{background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:35px 30px;text-align:center}
+  .header h1{font-size:26px;margin-bottom:8px}
+  .header p{font-size:13px;opacity:.9}
+  .body{padding:30px}
+  .msg{padding:14px 18px;border-radius:10px;margin-bottom:20px;font-size:14px}
+  .msg.ok{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+  .msg.err{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+  label{display:block;margin-bottom:8px;font-weight:600;color:#495057;font-size:14px}
+  select,textarea{width:100%;padding:12px;border:1px solid #dee2e6;border-radius:10px;font-family:inherit;font-size:14px;transition:all .2s;margin-bottom:18px}
+  textarea{min-height:160px;resize:vertical}
+  select:focus,textarea:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.15)}
+  .btn{width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:16px;font-weight:bold;cursor:pointer;transition:all .2s}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(102,126,234,.4)}
+  .history{margin-top:25px;padding:20px;background:#f8f9fa;border-radius:14px}
+  .history h3{font-size:16px;color:#495057;margin-bottom:12px}
+  .history-item{background:white;padding:15px;border-radius:10px;margin-bottom:10px;border-left:4px solid #667eea}
+  .status-tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;margin-right:8px}
+  .pending{background:#fef3c7;color:#92400e}
+  .accepted{background:#d4edda;color:#155724}
+  .rejected{background:#f8d7da;color:#721c24}
+  .content{font-size:13px;color:#495057;margin:8px 0;line-height:1.6}
+  .time{font-size:11px;color:#6c757d}
+  .reply{background:#e9ecef;padding:10px 14px;border-radius:8px;margin-top:8px;font-size:13px;color:#495057}
+  .back{display:block;text-align:center;margin-top:15px;color:#667eea;text-decoration:none;font-size:13px}
+  .back:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>📝 申诉中心</h1>
+      <p>如您对账号/店铺的处罚结果有异议，请在此填写申诉内容</p>
+    </div>
+    <div class="body">
+      <% if (typeof msg !== 'undefined' && msg) { %>
+        <div class="msg <%= success ? 'ok' : 'err' %>"><%= msg %></div>
+        <% if (success) { %>
+          <p style="text-align:center;color:#495057;">3秒后自动跳转到登录页...</p>
+          <script>
+            setTimeout(function() {
+              window.location.href = '/login';
+            }, 3000);
+          </script>
+        <% } %>
+      <% } else { %>
+        <form action="/appeal" method="post">
+          <label>申诉类型</label>
+          <select name="appeal_type">
+            <option value="ban">账号封禁申诉</option>
+            <option value="shop">店铺封禁申诉</option>
+            <option value="warning">警告申诉</option>
+            <option value="other">其他申诉</option>
+          </select>
+          <label>申诉内容</label>
+          <textarea name="content" placeholder="请详细说明您的申诉理由和情况，这将有助于管理员更快地审核您的申诉..."></textarea>
+          <button type="submit" class="btn">✉️ 提交申诉</button>
+        </form>
+      <% } %>
+
+      <% if (appeal) { %>
+      <div class="history">
+        <h3>📜 您最近的申诉记录</h3>
+        <div class="history-item">
+          <span class="status-tag <%= appeal.status %>"><%= appeal.status === 'pending' ? '待处理' : appeal.status === 'accepted' ? '已通过' : '已驳回' %></span>
+          <span style="font-size:13px;color:#495057"><%= appeal.appeal_type === 'ban' ? '账号封禁' : appeal.appeal_type === 'shop' ? '店铺封禁' : appeal.appeal_type === 'warning' ? '警告' : '其他' %></span>
+          <div class="content"><%= appeal.content %></div>
+          <% if (appeal.admin_reply && appeal.admin_reply !== '') { %><div class="reply"><strong>管理员回复：</strong><%= appeal.admin_reply %></div><% } %>
+          <div class="time"><%= appeal.created_at %></div>
+        </div>
+      </div>
+      <% } %>
+
+      <a href="/shop" class="back">← 返回商城首页</a>
+    </div>
+  </div>
+</body>
+</html>

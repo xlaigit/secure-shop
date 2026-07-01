@@ -1,0 +1,92 @@
+<!-- 文件: d:\肖宇帆\HTML项目\views\admin_shops.ejs -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>店铺管理 - 后台</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;padding:20px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:24px;color:#2d3748;margin-bottom:20px}
+  .nav{margin-bottom:20px}
+  .nav a{color:#4299e1;text-decoration:none;margin-right:15px;font-size:14px}
+  .nav a:hover{text-decoration:underline}
+  table{width:100%;background:white;border-collapse:collapse;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+  th{background:linear-gradient(135deg,#ed8936,#dd6b20);color:white;padding:15px 12px;text-align:left;font-size:13px;letter-spacing:1px}
+  td{padding:15px 12px;border-bottom:1px solid #edf2f7;font-size:13px;color:#2d3748;vertical-align:top}
+  tr:hover{background:#fffaf0}
+  .tag{display:inline-block;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;margin-right:4px}
+  .ok{background:#c6f6d5;color:#22543d}
+  .warn{background:#fef3c7;color:#92400e}
+  .banned{background:#fed7d7;color:#9b2c2c}
+  select,textarea,input{padding:6px 8px;border:1px solid #cbd5e0;border-radius:6px;font-family:inherit;font-size:12px;margin-right:4px;margin-bottom:4px}
+  textarea{min-height:50px;width:100%;resize:vertical}
+  input[type=number]{width:90px}
+  .btn{padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;transition:all .15s}
+  .btn-warn{background:#f6ad55;color:white}
+  .btn-warn:hover{background:#ed8936}
+  .btn-ban{background:#fc8181;color:white}
+  .btn-ban:hover{background:#f56565}
+  .btn-un{background:#68d391;color:white}
+  .btn-un:hover{background:#48bb78}
+  form{margin-top:6px}
+  .info{font-size:11px;color:#718096;line-height:1.6;margin-bottom:6px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="/admin/dashboard"><i class="fas fa-home"></i> 仪表盘</a>
+      <a href="/admin/users"><i class="fas fa-users"></i> 用户</a>
+      <a href="/admin/reports"><i class="fas fa-flag"></i> 举报</a>
+      <a href="/admin/appeals"><i class="fas fa-gavel"></i> 申诉</a>
+    </div>
+    <h1><i class="fas fa-store"></i> 店铺管理</h1>
+    <% if (shops && shops.length) { %>
+      <table>
+        <tr>
+          <th>店铺ID</th><th>店铺名</th><th>店主</th><th>描述</th><th>状态</th><th>警告到期</th><th>创建时间</th><th>操作</th>
+        </tr>
+        <% for (var i = 0; i < shops.length; i++) { var s = shops[i]; %>
+        <tr>
+          <td>#<%= s.id %></td>
+          <td><strong><%= s.name %></strong></td>
+          <td><%= s.owner_name %></td>
+          <td style="max-width:250px"><%= s.description %></td>
+          <td>
+            <% if (s.is_banned) { %><span class="tag banned">🚫 已封禁</span><% } else if (s.warning_until) { %><span class="tag warn">⚠️ 警告中</span><% } else { %><span class="tag ok">✓ 正常</span><% } %>
+          </td>
+          <td><%= s.warning_until || '-' %></td>
+          <td><%= s.created_at %></td>
+          <td>
+            <% if (!s.is_banned) { %>
+            <form action="/admin/shops/<%= s.id %>/warn" method="post">
+              <div class="info">⚠️ 警告该店铺：期间商品不显示，无法发布新商品</div>
+              <input type="number" name="minutes" min="1" placeholder="分钟" value="60">
+              <textarea name="note" placeholder="警告备注（发给店主）"></textarea>
+              <button type="submit" class="btn btn-warn">⚠️ 发出警告</button>
+            </form>
+            <form action="/admin/shops/<%= s.id %>/ban" method="post">
+              <div class="info">🚫 封禁店铺：输入 0 表示永久封禁</div>
+              <input type="number" name="minutes" min="0" placeholder="分钟/0=永久" value="0">
+              <textarea name="note" placeholder="封禁备注（发给店主）"></textarea>
+              <button type="submit" class="btn btn-ban">🚫 封禁店铺</button>
+            </form>
+            <% } else { %>
+            <form action="/admin/shops/<%= s.id %>/unban" method="post">
+              <button type="submit" class="btn btn-un">✅ 解除封禁</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+        <% } %>
+      </table>
+    <% } else { %>
+      <div style="text-align:center;padding:40px;color:#a0aec0;background:white;border-radius:12px">🏪 暂无店铺</div>
+    <% } %>
+  </div>
+</body>
+</html>

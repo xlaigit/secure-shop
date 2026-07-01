@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>管理店铺 - <%= shop.name %></title>
+<style>
+  body{font-family:'Microsoft YaHei',sans-serif;background:#f5f5f5;margin:0;padding:20px}
+  .nav{background:white;padding:12px 20px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:20px}
+  .nav a{color:#4299e1;text-decoration:none;margin-right:15px;font-size:14px}
+  .nav a:hover{text-decoration:underline}
+  .warn-banner{background:linear-gradient(135deg,#f6ad55,#ed8936);color:white;padding:20px;border-radius:12px;margin-bottom:20px;box-shadow:0 6px 20px rgba(237,137,54,.25)}
+  .warn-banner h3{margin-bottom:8px}
+  .warn-banner p{margin:6px 0;font-size:13px}
+  .warn-banner a{color:white;text-decoration:underline;font-weight:bold}
+  .container{background:white;padding:25px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  h2{color:#2d3748;margin-top:0}
+  h3{color:#4a5568;border-bottom:2px solid #e2e8f0;padding-bottom:6px;margin-top:25px}
+  form{background:#f7fafc;padding:15px;border-radius:8px;margin-bottom:15px}
+  label{display:block;margin:8px 0;font-size:13px;color:#4a5568}
+  input[type=text],input[type=number]{padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;width:200px}
+  button{padding:8px 16px;background:#4299e1;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-top:8px}
+  button:hover{background:#3182ce}
+  ul{list-style:none;padding:0}
+  li{background:#f7fafc;padding:12px 15px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .shop-desc{color:#718096;font-size:14px;margin:10px 0 20px}
+</style></head>
+<body>
+  <div class="nav">
+    <a href="/shop">🛒 商城</a> | <a href="/friends">👥 好友</a> | <a href="/chat">💬 群聊</a> | <a href="/shop/create">🏪 开店</a> | <a href="/shop/manage">📦 我的店铺</a> | <a href="/notifications">📨 邮件</a> | <a href="/appeal">📝 申诉</a>
+  </div>
+
+  <% if (typeof shopWarning !== 'undefined' && shopWarning) { %>
+    <div class="warn-banner">
+      <h3>⚠️ 您的店铺当前处于警告期</h3>
+      <p>警告到期时间：<strong id="warnTime"><%= warningUntil %></strong></p>
+      <p>在此期间，您的商品将不在商城首页展示，且无法发布新商品。</p>
+      <p>如果您认为此警告有误，可以 <a href="/appeal">提交申诉 →</a></p>
+    </div>
+  <% } %>
+
+  <div class="container">
+    <h2>🏪 <%= shop.name %></h2>
+    <p class="shop-desc"><%= shop.description %></p>
+    <h3>📝 添加商品</h3>
+    <% if (typeof shopWarning !== 'undefined' && shopWarning) { %>
+      <p style="color:#dd6b20;background:#fffaf0;padding:10px;border-radius:8px">⚠️ 警告期内无法发布新商品，请等待警告结束或申诉。</p>
+    <% } else { %>
+    <form method="POST" action="/shop/product/add">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>名称：<input name="name" required></label><br>
+      <label>价格：<input type="number" step="0.01" name="price" required></label><br>
+      <label>库存：<input type="number" name="stock" value="999"></label><br>
+      <button type="submit">✅ 添加</button>
+    </form>
+    <% } %>
+    <h3>📦 商品列表</h3>
+    <ul>
+      <% products.forEach(p => { %>
+        <li>
+          <span><strong><%= p.name %></strong> - ¥<%= p.price %> (库存:<%= p.stock %>)</span>
+          <form method="POST" action="/shop/product/delete/<%= p.id %>" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" style="background:#fc8181">🗑️ 删除</button>
+          </form>
+        </li>
+      <% }) %>
+      <% if (products.length === 0) { %><li style="justify-content:center;color:#a0aec0">📭 暂无商品，快来添加吧！</li><% } %>
+    </ul>
+  </div>
+  <% if (typeof warningUntil !== 'undefined' && warningUntil) { %>
+  <script>
+    var wt = document.getElementById('warnTime');
+    if (wt) { var d = new Date('<%= warningUntil %>'); wt.textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+  </script>
+  <% } %>
+</body></html>

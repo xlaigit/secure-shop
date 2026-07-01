@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>退款管理 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:10}
+    .nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .nav .brand-icon{width:36px;height:36px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .nav .brand-icon svg{width:18px;height:18px;color:white}
+    .nav .menu{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+    .nav .menu a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .nav .menu a:hover{background:#f3f4f6;color:#667eea}
+    .nav .menu a.active{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .nav .menu a.danger{color:#dc2626}
+    .nav .menu a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1200px;margin:0 auto;padding:24px 28px}
+    .header-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border-radius:18px;padding:22px 26px;margin-bottom:24px;box-shadow:0 10px 30px rgba(102,126,234,0.25)}
+    .header-card h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px}
+    .header-card p{font-size:13px;color:rgba(255,255,255,0.85);opacity:0.9}
+    .table-container{background:white;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;border:2px solid #e5e7eb}
+    .data-table{width:100%;border-collapse:collapse}
+    .data-table th{background:#f9fafb;padding:14px 12px;text-align:left;font-size:13px;font-weight:600;color:#374151;border-bottom:2px solid #e5e7eb}
+    .data-table td{padding:14px 12px;border-bottom:1px solid #f3f4f6;font-size:13.5px}
+    .data-table tr:hover{background:#f9fafb}
+    .data-table tr:last-child td{border-bottom:none}
+    .status-badge{padding:4px 8px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap}
+    .status-pending{background:#fffbeb;color:#92400e}
+    .status-approved{background:#ecfdf5;color:#065f46}
+    .status-rejected{background:#fef2f2;color:#991b1b}
+    .btn{padding:8px 12px;border:none;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+    .btn-success{background:#10b981;color:white}
+    .btn-success:hover{background:#059669;transform:translateY(-1px)}
+    .btn-danger{background:#ef4444;color:white}
+    .btn-danger:hover{background:#dc2626;transform:translateY(-1px)}
+    .form-inline{display:inline-flex;gap:6px;align-items:center}
+    .form-inline input{padding:6px 8px;border:2px solid #e5e7eb;border-radius:8px;font-size:12.5px;width:120px}
+    .form-inline input:focus{outline:none;border-color:#667eea}
+    .empty-state{text-align:center;padding:60px 20px;background:white;border-radius:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .empty-state .ico{font-size:48px;margin-bottom:12px;opacity:0.5}
+    .empty-state h3{font-size:18px;font-weight:600;margin-bottom:8px;color:#1f2937}
+    .empty-state p{color:#6b7280;font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <span>安全练习商城 · 管理后台</span>
+    </div>
+    <div class="menu">
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/products">📦 商品管理</a>
+      <a href="/admin/orders">📋 订单管理</a>
+      <a class="active" href="/admin/refunds">💸 退款管理</a>
+      <a href="/admin/users">👥 用户管理</a>
+      <a href="/admin/shops">🏪 店铺管理</a>
+      <a href="/chat">💬 聊天室</a>
+      <a class="danger" href="/admin/logout">退出</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header-card">
+      <h1>💸 退款管理</h1>
+      <p>处理用户的退款申请，查看所有退款记录</p>
+    </div>
+
+    <% if (refunds.length === 0) { %>
+      <div class="empty-state">
+        <div class="ico">📭</div>
+        <h3>暂无退款申请</h3>
+        <p>用户提交退款申请后将在这里显示</p>
+      </div>
+    <% } else { %>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>退款ID</th>
+              <th>订单ID</th>
+              <th>用户</th>
+              <th>商品</th>
+              <th>店铺</th>
+              <th>金额</th>
+              <th>申请时间</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% refunds.forEach(function(r) { %>
+              <tr>
+                <td><%= r.id %></td>
+                <td><%= r.order_id %></td>
+                <td><%= r.user_name %></td>
+                <td><%= r.product_name %></td>
+                <td><%= r.shop_name || '平台自营' %></td>
+                <td>¥<%= parseFloat(r.amount).toFixed(2) %></td>
+                <td><%= r.created_at %></td>
+                <td>
+                  <span class="status-badge <%= 
+                    r.status === 'pending' ? 'status-pending' : 
+                    r.status === 'approved' ? 'status-approved' : 'status-rejected'
+                  %>">
+                    <%= r.status === 'pending' ? '审核中' : 
+                      r.status === 'approved' ? '已通过' : '已驳回'
+                    %>
+                  </span>
+                </td>
+                <td>
+                  <% if (r.status === 'pending') { %>
+                    <div class="form-inline">
+                      <form method="POST" action="/admin/refunds/<%= r.id %>/approve" class="form-inline">
+                        <input type="text" name="reply" placeholder="回复内容">
+                        <button type="submit" class="btn btn-success">✅ 通过</button>
+                      </form>
+                    </div>
+                    <div class="form-inline" style="margin-top:6px;">
+                      <form method="POST" action="/admin/refunds/<%= r.id %>/reject" class="form-inline">
+                        <input type="text" name="reply" placeholder="驳回理由">
+                        <button type="submit" class="btn btn-danger">❌ 驳回</button>
+                      </form>
+                    </div>
+                  <% } else { %>
+                    <%= r.admin_reply || '无回复内容' %>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</body>
+</html>

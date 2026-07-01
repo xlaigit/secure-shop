@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>私聊 - <%= friend.username %></title></head>
+<body>
+  <div>
+    <a href="/friends">返回好友</a>
+  </div>
+  <hr>
+  <h2>与 <%= friend.username %> 私聊</h2>
+  <div id="messages" style="height:300px;overflow-y:auto;border:1px solid #ccc;padding:10px">
+    <% messages.forEach(m => { %>
+      <p><b><%= m.from_user == user.id ? '我' : friend.username %>:</b> <%= m.message %> <small><%= m.time %></small></p>
+    <% }) %>
+  </div>
+  <input id="msgInput" placeholder="输入消息"><button onclick="send()">发送</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const friendId = '<%= friend.username %>';
+    const msgDiv = document.getElementById('messages');
+    socket.emit('login', { id: '<%= user.id %>', username: '<%= user.username %>' });
+    socket.on('privateMsg', (data) => {
+      msgDiv.innerHTML += `<p><b>${data.from}:</b> ${data.message} <small>${data.time}</small></p>`;
+      msgDiv.scrollTop = msgDiv.scrollHeight;
+    });
+    function send() {
+      const input = document.getElementById('msgInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      socket.emit('privateMsg', { to: '<%= friend.id %>', message: msg });
+      msgDiv.innerHTML += `<p><b>我:</b> ${msg} <small>刚刚</small></p>`;
+      input.value = '';
+      msgDiv.scrollTop = msgDiv.scrollHeight;
+    }
+  </script>
+</body></html>

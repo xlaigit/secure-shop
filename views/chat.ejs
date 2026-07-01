@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>聊天室</title>
+  <style>
+    :root{--bg:#07111f;--panel:#0f172a;--panel2:#111c2f;--text:#f8fafc;--muted:#94a3b8;--accent:#38bdf8;--accent2:#34d399;--border:rgba(255,255,255,0.12)}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#07111f,#111827);color:var(--text)}
+    .nav{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:rgba(15,23,42,0.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+    .nav a{color:#dbeafe;text-decoration:none;margin-left:10px;padding:6px 10px;border-radius:999px} .nav a:hover{background:rgba(56,189,248,0.16)}
+    .wrap{max-width:1200px;margin:20px auto;padding:0 16px 24px}
+    .shell{display:grid;grid-template-columns:1.4fr 0.6fr;gap:20px}
+    .card{background:rgba(15,23,42,0.92);border:1px solid var(--border);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.25)}
+    .chat{display:flex;flex-direction:column;height:620px}
+    .header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .members{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.03)}
+    .messages{flex:1;overflow-y:auto;padding:16px;background:linear-gradient(180deg,rgba(56,189,248,0.04),rgba(255,255,255,0.01))}
+    .msg{margin:10px 0;max-width:82%;padding:10px 12px;border-radius:14px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.2)}
+    .msg .user{font-weight:700;color:#bae6fd;font-size:13px;margin-bottom:6px}
+    .msg .text{word-break:break-all;line-height:1.45}
+    .msg .time{font-size:11px;color:var(--muted);margin-top:6px}
+    .msg .report{font-size:11px;color:#fca5a5;cursor:pointer;margin-left:10px;text-decoration:none;opacity:0.7;transition:opacity 0.15s}
+    .msg .report:hover{opacity:1;text-decoration:underline}
+    .file-msg{background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.2)}
+    .file-msg a{color:#bbf7d0}
+    .input-area{display:flex;padding:12px;border-top:1px solid var(--border);gap:10px}
+    .input-area input{flex:1;padding:11px 12px;border:1px solid var(--border);border-radius:999px;background:#0b1220;color:var(--text)}
+    .input-area button{border:none;border-radius:999px;padding:10px 16px;background:linear-gradient(90deg,var(--accent),#2563eb);color:#fff;cursor:pointer}
+    .sidebar{padding:18px;display:flex;flex-direction:column;gap:14px;height:fit-content}
+    .side-card{padding:16px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,0.03)}
+    .side-card h3{margin:0 0 12px;font-size:16px}
+    .side-card input[type=file]{width:100%;margin-bottom:8px}
+    .side-card button{width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(90deg,var(--accent2),#059669);color:#fff;cursor:pointer}
+    .pill{display:inline-block;margin:2px 4px;padding:4px 8px;background:rgba(52,211,153,0.16);color:#bbf7d0;border-radius:999px;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div><strong>💬 群聊</strong></div>
+    <div>
+      <a href="/shop">商城</a>
+      <a href="/orders">订单</a>
+      <a href="/friends">好友</a>
+      <a href="/chat">群聊</a>
+      <a href="/shop/create">开店</a>
+      <a href="/profile">头像</a>
+      <a href="/logout">注销</a>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="shell">
+      <div class="card chat">
+        <div class="header">
+          <div>
+            <strong>群聊会话</strong>
+            <div class="muted" style="font-size:13px">欢迎，<%= username %></div>
+          </div>
+        </div>
+        <div class="members">
+          <strong>成员：</strong>
+          <% if (groupMembers && groupMembers.length) { %>
+            <% groupMembers.forEach(function(member){ %>
+              <span class="pill"><%= member.username %></span>
+            <% }) %>
+          <% } else { %>
+            <span style="color:#94a3b8">当前为公开群聊</span>
+          <% } %>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div class="input-area">
+          <input id="msgInput" placeholder="输入消息..." maxlength="500">
+          <button id="sendBtn">发送</button>
+        </div>
+      </div>
+      <div class="sidebar">
+        <div class="card side-card">
+          <h3>📁 文件共享</h3>
+          <input type="file" id="fileInput"><br>
+          <button id="uploadBtn">上传</button>
+          <p style="font-size:12px;color:#94a3b8;margin-top:8px">最大10MB</p>
+        </div>
+        <div class="card side-card" style="background:rgba(254,202,202,0.08);border-color:rgba(239,68,68,0.25)">
+          <h3>🚩 举报中心</h3>
+          <p style="font-size:13px;color:#fecaca;margin-bottom:10px;line-height:1.5">发现不良内容、恶意用户或违规文件？点击消息旁的「举报」按钮，或使用下方通道举报当前聊天。</p>
+          <button onclick="location.href='/report?type=chat&id=general&name='+encodeURIComponent('群聊内容')" style="width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(90deg,#ef4444,#dc2626);color:#fff;cursor:pointer;font-weight:600">举报当前聊天</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function(){
+    var socket = io();
+    var user = '<%= username %>';
+    var csrfToken = '<%= csrfToken %>';
+    var msgs = document.getElementById('messages');
+    var inp = document.getElementById('msgInput');
+    var sendBtn = document.getElementById('sendBtn');
+    var uploadBtn = document.getElementById('uploadBtn');
+    var fileInput = document.getElementById('fileInput');
+
+    function addMsg(d) {
+      var div = document.createElement('div');
+      if (d.type === 'file') {
+        div.className = 'msg file-msg';
+        var displayName = d.name || '文件';
+        var reportUrl = '/report?type=file&id=' + encodeURIComponent(displayName) + '&name=' + encodeURIComponent(d.uploader + ' 上传的文件');
+        div.innerHTML = '<div class="user">📎 ' + d.uploader + ' <a class="report" href="' + reportUrl + '">🚩 举报</a></div><div class="text"><a href="' + d.url + '" download="' + d.name + '">' + d.name + '</a> (' + (d.size/1024).toFixed(1) + 'KB)</div><div class="time">' + d.time + '</div>';
+      } else {
+        div.className = 'msg';
+        var content = (d.msg || '').substring(0, 60).replace(/[&<>"']/g, '');
+        var userReport = '/report?type=user&id=' + encodeURIComponent(d.user) + '&name=' + encodeURIComponent('用户 ' + d.user);
+        var msgReport = '/report?type=message&id=' + encodeURIComponent(d.user + '-' + d.time) + '&name=' + encodeURIComponent(d.user + ' 的消息');
+        div.innerHTML = '<div class="user">' + d.user + ' <a class="report" href="' + userReport + '">🚩 举报用户</a> <a class="report" href="' + msgReport + '">🚩 举报消息</a></div><div class="text">' + d.msg + '</div><div class="time">' + d.time + '</div>';
+      }
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function sendMsg() {
+      var m = inp.value.trim();
+      if (!m) return;
+      socket.emit('msg', { user: user, msg: m });
+      inp.value = '';
+    }
+
+    socket.on('history', function(ms) { ms.forEach(addMsg); });
+    socket.on('msg', addMsg);
+
+    sendBtn.onclick = sendMsg;
+    inp.onkeypress = function(e) { if (e.key === 'Enter') sendMsg(); };
+
+    uploadBtn.onclick = function() {
+      var file = fileInput.files[0];
+      if (!file) return alert('请选择文件');
+      if (file.size > 10 * 1024 * 1024) return alert('最大10MB');
+      var formData = new FormData();
+      formData.append('file', file);
+      formData.append('_csrf', csrfToken);
+      fetch('/chat/upload', {
+        method: 'POST',
+        body: formData
+      }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) alert(data.error);
+        else fileInput.value = '';
+      }).catch(function(err) {
+        alert('上传失败: ' + err.message);
+      });
+    };
+  })();
+  </script>
+</body>
+</html>
