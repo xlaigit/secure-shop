@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>优惠券管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+    .form-row>div{display:flex;flex-direction:column}
+    .form-row label{font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:500}
+    .form-row input,.form-row select{padding:8px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none}
+    .form-row input:focus,.form-row select:focus{border-color:#8b5cf6}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;box-shadow:0 4px 12px rgba(139,92,246,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(139,92,246,.4)}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px}
+    tr:hover td{background:#f5f3ff}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-active{background:#ecfdf5;color:#065f46}
+    .badge-expired{background:#fef2f2;color:#991b1b}
+    .badge-admin{background:#f5f3ff;color:#6d28d9}
+    .code-tag{font-family:monospace;background:#f3f4f6;padding:3px 8px;border-radius:6px;font-size:13px;font-weight:700;letter-spacing:1px}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    @media(max-width:768px){.form-row{flex-direction:column}.nav{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <span class="brand">🎫 优惠券管理中心</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/products">📦 商品</a>
+      <a href="/admin/flash">⚡ 秒杀</a>
+      <a href="/admin/coupons" class="active">🎫 优惠券</a>
+      <a href="/admin/refunds">💸 退款</a>
+      <a href="/admin/users">👥 用户</a>
+      <a href="/admin/logout">退出</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>🎫 优惠券管理</h1>
+
+    <div class="card">
+      <h2>➕ 创建优惠券</h2>
+      <form method="POST" action="/admin/coupons/create">
+        <div class="form-row">
+          <div>
+            <label>优惠码</label>
+            <input type="text" name="code" required placeholder="如 SAVE20" style="width:120px;text-transform:uppercase">
+          </div>
+          <div>
+            <label>折扣（%）</label>
+            <input type="number" name="discount" value="20" min="1" max="99" required style="width:80px;">
+          </div>
+          <div>
+            <label>适用范围</label>
+            <select name="product_id" style="min-width:160px;">
+              <option value="">全场通用</option>
+              <% products.forEach(function(p) { %>
+                <option value="<%= p.id %>"><%= p.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label>使用上限</label>
+            <input type="number" name="max_uses" value="100" min="1" required style="width:80px;">
+          </div>
+          <div>
+            <label>过期时间</label>
+            <input type="datetime-local" name="expires_at" required>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" type="submit">创建优惠券</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>📋 优惠券列表</h2>
+      <% if (coupons.length === 0) { %>
+        <div class="empty"><p>暂无优惠券</p></div>
+      <% } else { %>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>优惠码</th><th>折扣</th><th>适用范围</th><th>已用/上限</th><th>过期时间</th><th>状态</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          <% coupons.forEach(function(c) { %>
+          <tr>
+            <td><%= c.id %></td>
+            <td><span class="code-tag"><%= c.code %></span></td>
+            <td><strong style="color:#7c3aed">-<%= c.discount %>%</strong></td>
+            <td><%= c.product_name || '全场通用' %></td>
+            <td><%= c.used_count %>/<%= c.max_uses %></td>
+            <td><%= c.expires_at %></td>
+            <td>
+              <% var expired = new Date(c.expires_at) < new Date(); %>
+              <span class="badge <%= c.is_active && !expired ? 'badge-active' : 'badge-expired' %>">
+                <%= c.is_active && !expired ? '有效' : '已过期' %>
+              </span>
+            </td>
+            <td>
+              <form method="POST" action="/admin/coupons/delete/<%= c.id %>" style="display:inline" onsubmit="return confirm('删除此优惠券？')">
+                <button class="btn btn-danger" type="submit">🗑 删除</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

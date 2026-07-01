@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>快递查询</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .container{text-align:center;background:white;border-radius:20px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,.08);width:420px}
+    .icon{font-size:48px;margin-bottom:16px}
+    h1{font-size:22px;margin-bottom:8px}
+    p{color:#6b7280;font-size:14px;margin-bottom:24px}
+    input{width:100%;padding:14px 16px;border:2px solid #e5e7eb;border-radius:12px;font-size:16px;font-family:inherit;text-align:center;text-transform:uppercase;letter-spacing:1px}
+    input:focus{outline:none;border-color:#667eea}
+    button{width:100%;margin-top:12px;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit}
+    .msg{margin-top:16px;font-size:14px;color:#ef4444}
+    .back{display:block;margin-top:20px;color:#667eea;text-decoration:none;font-size:14px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="icon">📦</div>
+  <h1>快递单号查询</h1>
+  <p>输入快递单号查看物流信息</p>
+  <form method="POST" action="/track">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input name="tracking_number" placeholder="快递单号，如：SF123456" required autofocus>
+    <button type="submit">🔍 查询</button>
+  </form>
+  <% if (msg) { %><div class="msg"><%= msg %></div><% } %>
+  <a class="back" href="/shop">← 返回商城</a>
+</div>
+</body>
+</html>

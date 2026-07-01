@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>快递追踪</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
+    .container{max-width:600px;margin:0 auto;padding:20px}
+    .back{display:inline-block;margin-bottom:16px;color:#667eea;text-decoration:none;font-size:14px;font-weight:500}
+    .card{background:white;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h2{font-size:20px;margin-bottom:16px}
+    .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:14px}
+    .row .label{color:#6b7280}
+    .row .value{font-weight:600}
+    .status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+    .status-shipped{background:#fef3c7;color:#d97706}
+    .status-delivered{background:#d1fae5;color:#059669}
+    .status-signed{background:#e0e7ff;color:#4338ca}
+    .status-returning{background:#fee2e2;color:#dc2626}
+    .timeline{padding:16px 0}
+    .timeline-item{display:flex;gap:12px;padding:8px 0;align-items:flex-start}
+    .timeline-dot{width:12px;height:12px;border-radius:50%;background:#d1d5db;margin-top:4px;flex-shrink:0}
+    .timeline-dot.active{background:#10b981}
+    .timeline-text{font-size:14px}
+    .countdown{text-align:center;padding:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:14px;margin:16px 0}
+    .countdown .time{font-size:32px;font-weight:700;color:#d97706}
+    .btn{padding:12px 24px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;width:100%}
+    .btn-sign{background:linear-gradient(135deg,#10b981,#059669);color:white;font-size:16px}
+    .btn-return{background:linear-gradient(135deg,#ef4444,#dc2626);color:white}
+    .btn-disabled{background:#f3f4f6;color:#9ca3af;cursor:not-allowed}
+    .actions{display:flex;gap:10px;margin-top:16px}
+    .return-form{display:none;margin-top:12px}
+    .return-form textarea{width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;resize:vertical;min-height:80px;margin-bottom:8px}
+    .return-form textarea:focus{outline:none;border-color:#ef4444}
+  </style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="/orders">← 返回订单</a>
+  <div class="card">
+    <h2>📦 快递追踪</h2>
+    <div class="row"><span class="label">商品</span><span class="value"><%= ship.product_name %></span></div>
+    <div class="row"><span class="label">快递商</span><span class="value"><%= ship.carrier %> (<%= ship.speed %>)</span></div>
+        <div class="row"><span class="label">运费</span><span class="value">¥<%= ship.shipping_fee || 0 %></span></div>
+    <div class="row"><span class="label">快递单号</span><span class="value"><%= ship.tracking_number || '暂无' %></span></div>
+    <div class="row"><span class="label">重量</span><span class="value"><%= ship.weight %> kg</span></div>
+    <div class="row"><span class="label">发货时间</span><span class="value"><%= ship.shipped_at %></span></div>
+    <div class="row"><span class="label">状态</span><span class="value">
+      <% if (ship.status === 'shipped') { %><span class="status-badge status-shipped">🚚 运输中</span>
+      <% } else if (ship.status === 'delivered') { %><span class="status-badge status-delivered">📬 已送达</span>
+      <% } else if (ship.status === 'signed') { %><span class="status-badge status-signed">✅ 已签收</span>
+      <% } else if (ship.status === 'returning') { %><span class="status-badge status-returning">↩️ 退货中</span>
+      <% } else { %><span class="status-badge">⏳ 待发货</span><% } %>
+    </span></div>
+  </div>
+
+  <% if (ship.status === 'shipped' && !isDelivered) { %>
+    <div class="countdown">
+      <div style="font-size:14px;color:#92400e;margin-bottom:6px">⏱️ 预计送达倒计时</div>
+      <div class="time"><%= remainHours %> 小时 <%= remainMinutes %> 分钟</div>
+    </div>
+  <% } %>
+
+  <div class="card">
+    <h2>📋 物流时间线</h2>
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-dot active"></div>
+        <div class="timeline-text"><strong>已发货</strong><br><%= ship.shipped_at %></div>
+      </div>
+      <% if (ship.status === 'delivered' || ship.status === 'signed' || ship.status === 'returning' || isDelivered) { %>
+      <div class="timeline-item">
+        <div class="timeline-dot active"></div>
+        <div class="timeline-text"><strong>已送达</strong><br><%= ship.deliver_at %></div>
+      </div>
+      <% } else { %>
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-text" style="color:#9ca3af">预计送达<br><%= ship.deliver_at %></div>
+      </div>
+      <% } %>
+      <% if (ship.status === 'signed') { %>
+      <div class="timeline-item">
+        <div class="timeline-dot active"></div>
+        <div class="timeline-text"><strong>已签收</strong><br><%= ship.signed_at %></div>
+      </div>
+      <% } %>
+      <% if (ship.status === 'returning') { %>
+      <div class="timeline-item">
+        <div class="timeline-dot active" style="background:#ef4444"></div>
+        <div class="timeline-text"><strong>退货中</strong><br>原因：<%= ship.return_reason || '未填写' %></div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (ship.status === 'delivered' || isDelivered) { %>
+    <form method="POST" action="/orders/<%= ship.order_id %>/sign">
+      <button class="btn btn-sign">✅ 确认签收</button>
+    </form>
+    <div class="actions">
+      <button class="btn btn-return" onclick="document.getElementById('returnForm').style.display='block'">↩️ 申请退货</button>
+    </div>
+    <div class="return-form" id="returnForm">
+      <form method="POST" action="/orders/<%= ship.order_id %>/return">
+        <textarea name="reason" placeholder="退货原因..."></textarea>
+        <button class="btn btn-return">确认退货</button>
+      </form>
+    </div>
+  <% } else if (ship.status === 'shipped' && !isDelivered) { %>
+    <div class="actions">
+      <button class="btn btn-return" onclick="document.getElementById('returnForm').style.display='block'">↩️ 中途退货</button>
+    </div>
+    <div class="return-form" id="returnForm">
+      <form method="POST" action="/orders/<%= ship.order_id %>/return">
+        <textarea name="reason" placeholder="退货原因..."></textarea>
+        <button class="btn btn-return">确认退货</button>
+      </form>
+    </div>
+  <% } else if (ship.status === 'signed') { %>
+    <div class="card" style="text-align:center;color:#10b981;font-size:16px;font-weight:600">✅ 已签收，可去评价商品</div>
+  <% } else if (ship.status === 'returning') { %>
+    <div class="card" style="text-align:center;color:#ef4444;font-size:16px;font-weight:600">↩️ 退货处理中，请等待</div>
+  <% } %>
+</div>
+</body>
+</html>

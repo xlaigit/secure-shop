@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>秒杀管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#ef4444,#dc2626);color:white}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+    .form-row>div{display:flex;flex-direction:column}
+    .form-row label{font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:500}
+    .form-row input,.form-row select{padding:8px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+    .form-row input:focus,.form-row select:focus{border-color:#ef4444}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#ef4444,#dc2626);color:white;box-shadow:0 4px 12px rgba(239,68,68,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(239,68,68,.4)}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px}
+    tr:hover td{background:#fef2f2}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-active{background:#ecfdf5;color:#065f46}
+    .badge-end{background:#fef2f2;color:#991b1b}
+    .badge-future{background:#eff6ff;color:#1e40af}
+    .price-original{text-decoration:line-through;color:#9ca3af;font-size:12px}
+    .price-flash{color:#ef4444;font-weight:700;font-size:15px}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    .empty .icon{font-size:40px;margin-bottom:10px}
+    @media(max-width:768px){.form-row{flex-direction:column}.nav{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <span class="brand">⚡ 秒杀管理中心</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/products">📦 商品</a>
+      <a href="/admin/flash" class="active">⚡ 秒杀</a>
+      <a href="/admin/refunds">💸 退款</a>
+      <a href="/admin/users">👥 用户</a>
+      <a href="/admin/reports">🚩 举报</a>
+      <a href="/admin/logout">退出</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>⚡ 限时秒杀管理</h1>
+
+    <div class="card">
+      <h2>➕ 创建秒杀活动</h2>
+      <form method="POST" action="/admin/flash/create">
+        <div class="form-row">
+          <div>
+            <label>选择商品</label>
+            <select name="product_id" required style="min-width:200px;">
+              <option value="">-- 选择商品 --</option>
+              <% products.forEach(function(p) { %>
+                <option value="<%= p.id %>"><%= p.name %> (¥<%= p.price %>)</option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label>秒杀价格</label>
+            <input type="number" name="flash_price" step="0.01" min="0.01" required placeholder="如 9.99" style="width:100px;">
+          </div>
+          <div>
+            <label>秒杀库存</label>
+            <input type="number" name="stock" value="20" min="1" required style="width:80px;">
+          </div>
+          <div>
+            <label>开始时间</label>
+            <input type="datetime-local" name="start_time" required>
+          </div>
+          <div>
+            <label>结束时间</label>
+            <input type="datetime-local" name="end_time" required>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" type="submit">创建秒杀</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>📋 秒杀活动列表</h2>
+      <% if (sales.length === 0) { %>
+        <div class="empty">
+          <div class="icon">⚡</div>
+          <p>暂无秒杀活动，点击上方创建吧</p>
+        </div>
+      <% } else { %>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>商品</th>
+            <th>原价</th>
+            <th>秒杀价</th>
+            <th>库存</th>
+            <th>开始时间</th>
+            <th>结束时间</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% sales.forEach(function(s) { %>
+          <tr>
+            <td><%= s.id %></td>
+            <td><strong><%= s.product_name %></strong></td>
+            <td><span class="price-original">¥<%= s.original_price %></span></td>
+            <td><span class="price-flash">¥<%= s.flash_price %></span></td>
+            <td><%= s.stock %></td>
+            <td><%= s.start_time %></td>
+            <td><%= s.end_time %></td>
+            <td>
+              <span class="badge <%= s.is_active ? 'badge-active' : 'badge-end' %>">
+                <%= s.is_active ? '进行中' : '已结束' %>
+              </span>
+            </td>
+            <td>
+              <form method="POST" action="/admin/flash/delete/<%= s.id %>" style="display:inline" onsubmit="return confirm('确定删除此秒杀活动？')">
+                <button class="btn btn-danger" type="submit">🗑 删除</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

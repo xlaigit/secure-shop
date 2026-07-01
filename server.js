@@ -1,4 +1,18 @@
 const express = require('express');
+const { getDistanceKM, cityCoord } = require('./distance');
+// 运费计算
+function calcShippingFee(carrier, weight, distanceKm) {
+  const base = { '邮政': 8, '中通': 12, '顺丰陆运': 18, '顺丰空运': 23 }[carrier] || 10;
+  const perKg = { '邮政': 2, '中通': 3, '顺丰陆运': 5, '顺丰空运': 10 }[carrier] || 3;
+  const extraKg = Math.max(0, weight - 1);
+  let distMultiplier = 1;
+  if (distanceKm > 2000) distMultiplier = 2.0;
+  else if (distanceKm > 1000) distMultiplier = 1.6;
+  else if (distanceKm > 500) distMultiplier = 1.3;
+  else if (distanceKm > 100) distMultiplier = 1.0;
+  else distMultiplier = 0.8;
+  return Math.round((base + extraKg * perKg) * distMultiplier * 100) / 100;
+}
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const helmet = require('helmet');
@@ -114,7 +128,7 @@ app.use(session({
 
 const csrfProtection = csurf({ cookie: false });
 app.use((req, res, next) => {
-  if (['/chat/upload', '/upload', '/appeal'].includes(req.path) || req.path.startsWith('/refund/apply') || req.path.startsWith('/admin/refunds/')) return next();
+if (['/chat/upload', '/upload', '/appeal', '/friend/group', '/track'].includes(req.path) || req.path.startsWith('/refund/apply') || req.path.startsWith('/admin/refunds/') || req.path.startsWith('/admin/flash') || req.path.startsWith('/admin/coupons') || req.path.startsWith('/shop/coupons') || req.path.startsWith('/redeem') || req.path.startsWith('/shop/ship') || req.path.startsWith('/shop/warehouses') || req.path.startsWith('/admin/users/balance') || req.path.startsWith('/orders/') && (req.path.includes('/track') || req.path.includes('/sign') || req.path.includes('/return'))) return next();
   csrfProtection(req, res, next);
 });
 app.use((req, res, next) => {
@@ -302,14 +316,28 @@ app.get('/logout', (req, res) => {
 });
 
 app.get('/shop', isAuth, (req, res) => {
-  db.all(`SELECT p.*, s.name as shop_name, s.warning_until as shop_warning,
-    (SELECT ROUND(AVG(r.rating), 1) FROM reviews r WHERE r.product_id = p.id) as avg_rating,
-    (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as review_count
-    FROM products p LEFT JOIN shops s ON p.shop_id = s.id WHERE p.shop_id = 0 OR (s.is_banned = 0 AND (s.warning_until IS NULL OR s.warning_until = '')) ORDER BY p.shop_id = 0, p.id`, (err, products) => {
+  db.all('SELECT * FROM products ORDER BY id DESC', (err, products) => {
     if (err) return res.status(500).send('服务器错误');
-    res.render('shop', { products, balance: req.session.user.balance, warningActive: req.session.user.warningActive, warningUntil: req.session.user.warningUntil });
+    db.all(`SELECT f.*, p.name, p.price as original_price 
+      FROM flash_sales f JOIN products p ON f.product_id = p.id 
+      WHERE f.is_active = 1 AND f.stock > 0 
+      AND datetime(f.start_time) <= datetime('now','localtime') 
+      AND datetime(f.end_time) > datetime('now','localtime')`, (err2, flashSales) => {
+      db.all(`SELECT s.*, o.price, p.name as product_name
+        FROM shipments s JOIN orders o ON s.order_id = o.id 
+        JOIN products p ON o.product_id = p.id
+        WHERE o.user_id = ? AND s.status IN ('shipped','delivered')
+        ORDER BY s.shipped_at DESC LIMIT 5`, [req.session.user.id], (err3, shipments) => {
+        res.render('shop', { 
+          products, flashSales, shipments: shipments || [],
+          balance: req.session.user.balance, 
+          warningActive: req.session.user.warningActive, 
+          warningUntil: req.session.user.warningUntil 
+        });
+      }); 
+      });
+    });
   });
-});
 
 app.post('/buy', isAuth, (req, res) => {
   const pid = req.body.product_id;
@@ -318,60 +346,89 @@ app.post('/buy', isAuth, (req, res) => {
   db.get('SELECT p.*, s.owner_id FROM products p LEFT JOIN shops s ON p.shop_id = s.id WHERE p.id = ?', [pid], (err, product) => {
     if (err || !product) return res.status(404).send('商品不存在');
     if (product.stock <= 0) return res.status(400).send('库存不足');
+
+    db.get(`SELECT flash_price FROM flash_sales 
+      WHERE product_id = ? AND is_active = 1 AND stock > 0 
+      AND datetime(start_time) <= datetime('now','localtime') 
+      AND datetime(end_time) > datetime('now','localtime')`, [product.id], (err, flash) => {
+      const finalPrice = flash ? flash.flash_price : product.price;
+
+    const couponCode = (req.body.coupon || '').trim().toUpperCase();
+    let couponDiscount = 0;
+    let couponId = null;
+    const applyCoupon = function(cb) {
+      if (!couponCode) return cb();
+      db.get(`SELECT c.* FROM coupons c JOIN user_coupons uc ON c.id = uc.coupon_id 
+        WHERE c.code = ? AND uc.user_id = ? AND uc.used = 0 
+        AND c.is_active = 1 AND datetime(c.expires_at) > datetime('now','localtime')`, [couponCode, req.session.user.id], (err, coupon) => {
+        if (err || !coupon) return cb();
+        if (coupon.product_id && coupon.product_id !== product.id) return cb();
+        if (coupon.shop_id && coupon.shop_id !== product.shop_id) return cb();
+        couponDiscount = coupon.discount;
+        couponId = coupon.id;
+        cb();
+      });
+    };
+    applyCoupon(function() {
+      const discPrice = couponDiscount ? Math.round(finalPrice * (100 - couponDiscount)) / 100 : finalPrice;
     
     db.get('SELECT balance FROM users WHERE id = ?', [req.session.user.id], (err, user) => {
-      if (err || !user || user.balance < product.price) return res.status(400).send('余额不足');
+      if (err || !user || user.balance < discPrice) return res.status(400).send('余额不足');
       
-      const nb = user.balance - product.price;
-      const taxRate = 0.05; // 5%的税率
-      const tax = Math.round(product.price * taxRate * 100) / 100;
-      const amountToSeller = Math.round((product.price - tax) * 100) / 100;
+      const nb = user.balance - discPrice;
+      const taxRate = 0.05;
+      const tax = Math.round(discPrice * taxRate * 100) / 100;
+      const amountToSeller = Math.round((discPrice - tax) * 100) / 100;
       
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
         
-        // 扣除用户余额
         db.run('UPDATE users SET balance = ? WHERE id = ?', [nb, req.session.user.id], (err) => {
           if (err) { db.run('ROLLBACK'); return res.status(500).send('扣款失败'); }
         });
         
-        // 如果商品属于店铺，给商家打款
         if (product.shop_id > 0 && product.owner_id) {
           db.run('UPDATE users SET balance = balance + ? WHERE id = ?', [amountToSeller, product.owner_id], (err) => {
             if (err) { db.run('ROLLBACK'); return res.status(500).send('打款失败'); }
           });
         }
         
-        // 更新商品库存
         db.run('UPDATE products SET stock = stock - 1 WHERE id = ?', [pid], (err) => {
           if (err) { db.run('ROLLBACK'); return res.status(500).send('更新库存失败'); }
         });
         
-        // 创建订单（使用原有的订单字段，避免表结构修改）
         const oid = uuidv4();
         db.run('INSERT INTO orders (id, user_id, product_id, price) VALUES (?, ?, ?, ?)', 
-          [oid, req.session.user.id, pid, product.price], (err) => {
+          [oid, req.session.user.id, pid, discPrice], (err) => {
           if (err) { db.run('ROLLBACK'); return res.status(500).send('创建订单失败'); }
           
-          // 如果需要记录税款，可以创建单独的交易记录表
           if (product.shop_id > 0 && product.owner_id) {
             db.run('INSERT INTO transactions (order_id, from_user_id, to_user_id, amount, tax) VALUES (?, ?, ?, ?, ?)', 
               [oid, req.session.user.id, product.owner_id, amountToSeller, tax], (err) => {
               if (err) console.error('记录交易失败:', err);
             });
           }
-          
+
+          db.run('UPDATE flash_sales SET stock = stock - 1 WHERE product_id = ? AND stock > 0', [product.id]);
+          if (couponId) db.run('UPDATE user_coupons SET used = 1 WHERE coupon_id = ? AND user_id = ?', [couponId, req.session.user.id]);
+
           db.run('COMMIT');
           req.session.user.balance = nb;
           res.redirect('/orders');
         });
       });
     });
+    }); // applyCoupon
+    }); // flash
   });
 });
 
 app.get('/orders', isAuth, (req, res) => {
-  db.all('SELECT orders.id, orders.product_id, products.name as product_name, orders.price, orders.created_at, orders.status FROM orders JOIN products ON orders.product_id = products.id WHERE orders.user_id = ? ORDER BY orders.created_at DESC', [req.session.user.id], (err, rows) => {
+  db.all(`SELECT o.id, o.product_id, p.name as product_name, o.price, o.created_at, o.status,
+    s.id as ship_id, s.carrier, s.tracking_number, s.status as ship_status, s.deliver_at
+    FROM orders o JOIN products p ON o.product_id = p.id 
+    LEFT JOIN shipments s ON s.order_id = o.id
+    WHERE o.user_id = ? ORDER BY o.created_at DESC`, [req.session.user.id], (err, rows) => {
     if (err) return res.status(500).send('服务器错误');
     res.render('orders', { orders: rows, warningActive: req.session.user.warningActive, warningUntil: req.session.user.warningUntil });
   });
@@ -379,7 +436,6 @@ app.get('/orders', isAuth, (req, res) => {
 
 // 账单功能
 app.get('/billing', isAuth, (req, res) => {
-  // 获取用户的所有交易记录（订单+退款）
   db.all(`
     SELECT 
       o.id as order_id,
@@ -406,26 +462,53 @@ app.get('/billing', isAuth, (req, res) => {
     ORDER BY time DESC
   `, [req.session.user.id, req.session.user.id], (err, transactions) => {
     if (err) return res.status(500).send('服务器错误');
-    
-    // 计算统计信息
-    const stats = {
-      totalOrders: 0,
-      totalSpent: 0,
-      totalRefunds: 0,
-      refundedAmount: 0
-    };
-    
+    const stats = { orders: 0, totalSpent: 0, refunds: 0, refundedAmount: 0, refundCount: 0 };
     transactions.forEach(t => {
-      if (t.type === 'order') {
-        stats.totalOrders++;
-        stats.totalSpent += parseFloat(t.amount);
-      } else if (t.type === 'refund' && t.status === 'approved') {
-        stats.totalRefunds++;
-        stats.refundedAmount += parseFloat(t.amount);
-      }
+      if (t.type === 'order') { stats.orders++; stats.totalSpent += t.amount; }
+      else { stats.refunds++; stats.refundedAmount += t.amount; stats.refundCount++; }
     });
-    
     res.render('billing', { transactions, stats });
+  });
+});
+
+// 兑换中心
+app.get('/redeem', isAuth, (req, res) => {
+  db.all(`SELECT uc.*, c.code, c.discount, c.product_id, c.shop_id, c.expires_at, p.name as product_name
+    FROM user_coupons uc JOIN coupons c ON uc.coupon_id = c.id
+    LEFT JOIN products p ON c.product_id = p.id
+    WHERE uc.user_id = ? ORDER BY uc.claimed_at DESC`, [req.session.user.id], (err, coupons) => {
+    res.render('redeem', { coupons, msg: null });
+  });
+});
+
+app.post('/redeem', isAuth, (req, res) => {
+  const code = (req.body.code || '').trim().toUpperCase();
+  if (!code) return res.render('redeem', { coupons: [], msg: '请输入兑换码' });
+  db.get(`SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND used_count < max_uses 
+    AND datetime(expires_at) > datetime('now','localtime')`, [code], (err, coupon) => {
+    if (err || !coupon) {
+      return db.all(`SELECT uc.*, c.code, c.discount, c.expires_at FROM user_coupons uc JOIN coupons c ON uc.coupon_id = c.id WHERE uc.user_id = ?`, [req.session.user.id], (err2, coupons) => {
+        res.render('redeem', { coupons: coupons || [], msg: '兑换码无效或已过期' });
+      });
+    }
+    db.get('SELECT id FROM user_coupons WHERE user_id = ? AND coupon_id = ?', [req.session.user.id, coupon.id], (err, exist) => {
+      if (exist) {
+        return db.all(`SELECT uc.*, c.code, c.discount, c.expires_at FROM user_coupons uc JOIN coupons c ON uc.coupon_id = c.id WHERE uc.user_id = ?`, [req.session.user.id], (err2, coupons) => {
+          res.render('redeem', { coupons: coupons || [], msg: '你已经领取过该优惠券' });
+        });
+      }
+      db.run('INSERT INTO user_coupons (user_id, coupon_id) VALUES (?, ?)', [req.session.user.id, coupon.id], () => {
+        db.run('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?', [coupon.id]);
+        db.run('INSERT INTO notifications (user_id, title, content, type) VALUES (?, ?, ?, ?)',
+          [req.session.user.id, '🎫 优惠券到账', `恭喜获得 ${coupon.discount}% 折扣券，兑换码：${code}`, 'coupon']);
+        db.all(`SELECT uc.*, c.code, c.discount, c.product_id, c.shop_id, c.expires_at, p.name as product_name
+          FROM user_coupons uc JOIN coupons c ON uc.coupon_id = c.id
+          LEFT JOIN products p ON c.product_id = p.id
+          WHERE uc.user_id = ? ORDER BY uc.claimed_at DESC`, [req.session.user.id], (err2, coupons) => {
+          res.render('redeem', { coupons, msg: `🎉 兑换成功！获得 ${coupon.discount}% 折扣券` });
+        });
+      });
+    });
   });
 });
 
@@ -540,7 +623,20 @@ app.get('/admin/refunds', isAdmin, (req, res) => {
   });
 });
 
-app.get('/profile', isAuth, (req, res) => res.render('profile', { msg: null }));
+app.post('/profile/address', isAuth, (req, res) => {
+  const city = sanitize(req.body.city || '');
+  if (!city || !cityCoord[city]) return res.render('profile', { msg: '请选择有效城市', city: '' });
+  db.run('UPDATE users SET city = ? WHERE id = ?', [city, req.session.user.id], () => {
+    req.session.user.city = city;
+    res.render('profile', { msg: '地址绑定成功！', city });
+  });
+});
+
+app.get('/profile', isAuth, (req, res) => {
+  db.get('SELECT city FROM users WHERE id = ?', [req.session.user.id], (err, row) => {
+    res.render('profile', { msg: null, city: row ? row.city : '' });
+  });
+});
 app.get('/attack-log', isAuth, (req, res) => {
   if (!req.session.user || !req.session.user.isAdmin) return res.status(403).json({ error: '无权访问' });
   res.json(attackLog.slice(-100));
@@ -681,10 +777,46 @@ app.get('/shop/manage', isAuth, (req, res) => {
       if (!isNaN(until) && until > now) shopWarning = true;
     }
     if (shop.is_banned) return res.render('banned', { username: req.session.user.username, banUntil: null, appealSent: false, shopBanned: true });
-    db.all('SELECT * FROM products WHERE shop_id = ?', [shop.id], (err, products) => {
-      res.render('shop_manage', { shop, products, shopWarning, warningUntil: shop.warning_until });
+      db.all(`SELECT o.*, p.name as product_name, u.username as buyer_name, s.carrier, s.tracking_number, s.status as ship_status
+        FROM orders o JOIN products p ON o.product_id = p.id 
+        JOIN users u ON o.user_id = u.id 
+        LEFT JOIN shipments s ON s.order_id = o.id
+        WHERE p.shop_id = ? ORDER BY o.created_at DESC`, [shop.id], (err, orders) => {
+        db.all('SELECT * FROM products WHERE shop_id = ?', [shop.id], (err2, products) => {
+          db.all('SELECT * FROM warehouses WHERE shop_id = ?', [shop.id], (err3, whs) => {
+            res.render('shop_manage', { shop, products, orders: orders || [], warehouses: whs || [], shopWarning, warningUntil: shop.warning_until });
+          });
+        });
+  });
+});
+});
+
+app.get('/shop/coupons', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.status(404).send('你还没有店铺');
+    db.all(`SELECT c.*, p.name as product_name FROM coupons c LEFT JOIN products p ON c.product_id = p.id WHERE c.shop_id = ? ORDER BY c.id DESC`, [shop.id], (err, coupons) => {
+      db.all('SELECT id, name FROM products WHERE shop_id = ?', [shop.id], (err2, products) => {
+        res.render('shop_coupons', { shop, coupons, products });
+      });
     });
   });
+});
+
+app.post('/shop/coupons/create', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.redirect('/shop');
+    const { code, discount, product_id, max_uses, expires_at } = req.body;
+    const pid = product_id ? parseInt(product_id) : null;
+    const max = parseInt(max_uses) || 50;
+    const d = parseInt(discount);
+    if (!code || isNaN(d) || d < 1 || d > 99) return res.redirect('/shop/coupons');
+    db.run('INSERT INTO coupons (code, discount, product_id, shop_id, owner_id, max_uses, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [code.toUpperCase(), d, pid, shop.id, req.session.user.id, max, expires_at], () => res.redirect('/shop/coupons'));
+  });
+});
+
+app.post('/shop/coupons/delete/:id', isAuth, (req, res) => {
+  db.run('DELETE FROM coupons WHERE id = ?', [req.params.id], () => res.redirect('/shop/coupons'));
 });
 
 app.post('/shop/product/add', isAuth, (req, res) => {
@@ -942,7 +1074,47 @@ app.get('/admin/dashboard', isAdmin, (req, res) => {
   });
 });
 
+app.get('/admin/coupons', isAdmin, (req, res) => {
+  db.all(`SELECT c.*, p.name as product_name FROM coupons c LEFT JOIN products p ON c.product_id = p.id ORDER BY c.id DESC`, (err, coupons) => {
+    db.all('SELECT id, name FROM products', (err2, products) => {
+      res.render('admin_coupons', { coupons, products });
+    });
+  });
+});
+
+app.post('/admin/coupons/create', isAdmin, (req, res) => {
+  const { code, discount, product_id, max_uses, expires_at } = req.body;
+  const pid = product_id ? parseInt(product_id) : null;
+  const max = parseInt(max_uses) || 100;
+  const d = parseInt(discount);
+  if (!code || isNaN(d) || d < 1 || d > 99) return res.redirect('/admin/coupons');
+  db.run('INSERT INTO coupons (code, discount, product_id, shop_id, owner_id, max_uses, expires_at) VALUES (?, ?, ?, NULL, ?, ?, ?)',
+    [code.toUpperCase(), d, pid, req.session.user.id, max, expires_at], () => res.redirect('/admin/coupons'));
+});
+
+app.post('/admin/coupons/delete/:id', isAdmin, (req, res) => {
+  db.run('DELETE FROM coupons WHERE id = ?', [req.params.id], () => res.redirect('/admin/coupons'));
+});
+
 app.get('/admin/products', (req, res) => db.all('SELECT * FROM products', (err, products) => res.render('admin_products', { products })));
+app.get('/admin/flash', isAdmin, (req, res) => {
+  db.all(`SELECT f.*, p.name as product_name, p.price as original_price 
+    FROM flash_sales f JOIN products p ON f.product_id = p.id ORDER BY f.id DESC`, (err, sales) => {
+    db.all('SELECT id, name, price FROM products', (err2, products) => {
+      res.render('admin_flash', { sales, products });
+    });
+  });
+});
+
+app.post('/admin/flash/create', isAdmin, (req, res) => {
+  const { product_id, flash_price, stock, start_time, end_time } = req.body;
+  db.run('INSERT INTO flash_sales (product_id, flash_price, stock, start_time, end_time) VALUES (?, ?, ?, ?, ?)',
+    [product_id, flash_price, stock, start_time, end_time], () => res.redirect('/admin/flash'));
+});
+
+app.post('/admin/flash/delete/:id', isAdmin, (req, res) => {
+  db.run('DELETE FROM flash_sales WHERE id = ?', [req.params.id], () => res.redirect('/admin/flash'));
+});
 app.get('/admin/products/add', (req, res) => res.render('admin_product_form', { product: null, action: '/admin/products/add' }));
 app.post('/admin/products/add', (req, res) => {
   const n = sanitize(req.body.name || ''), p = parseFloat(req.body.price);
@@ -969,7 +1141,82 @@ app.get('/admin/users', (req, res) => {
   });
 });
 
+db.run(`CREATE TABLE IF NOT EXISTS coupons (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  discount INTEGER NOT NULL,
+  product_id INTEGER,
+  shop_id INTEGER,
+  owner_id INTEGER NOT NULL,
+  max_uses INTEGER DEFAULT 100,
+  used_count INTEGER DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  is_active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now','localtime'))
+)`);
+
+db.run(`CREATE TABLE IF NOT EXISTS user_coupons (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  coupon_id INTEGER NOT NULL,
+  used INTEGER DEFAULT 0,
+  claimed_at TEXT DEFAULT (datetime('now','localtime'))
+)`);
+
+db.run(`CREATE TABLE IF NOT EXISTS flash_sales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL,
+  flash_price REAL NOT NULL,
+  stock INTEGER NOT NULL DEFAULT 10,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  is_active INTEGER DEFAULT 1,
+  FOREIGN KEY (product_id) REFERENCES products(id)
+)`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS warehouses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shop_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    address TEXT DEFAULT '',
+    city TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (shop_id) REFERENCES shops(id)
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS shipments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL,
+    warehouse_id INTEGER,
+    carrier TEXT NOT NULL DEFAULT '邮政',
+    speed TEXT DEFAULT '标准',
+    tracking_number TEXT DEFAULT '',
+    weight REAL DEFAULT 0,
+    estimate_hours INTEGER DEFAULT 72,
+    shipped_at TEXT DEFAULT (datetime('now','localtime')),
+    deliver_at TEXT,
+    status TEXT DEFAULT 'pending',
+    signed_at TEXT,
+    return_reason TEXT,
+    shipping_fee REAL DEFAULT 0,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+  )
+`);
+
 // 初始化退款表（首次运行时执行）
+db.run(`CREATE TABLE IF NOT EXISTS transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER,
+  from_user_id INTEGER,
+  to_user_id INTEGER,
+  amount REAL,
+  tax REAL,
+  type TEXT DEFAULT 'purchase',
+  created_at TEXT DEFAULT (datetime('now','localtime'))
+)`);
 db.run(`
   CREATE TABLE IF NOT EXISTS refunds (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1034,6 +1281,7 @@ app.post('/admin/users/warn/:id', isAdmin, (req, res) => {
 });
 app.post('/admin/users/clear-warning/:id', isAdmin, (req, res) => {
   db.run('UPDATE users SET warning_until = NULL WHERE id = ?', [req.params.id], (err) => res.redirect('/admin/users'));
+});
 app.post('/admin/users/balance/:id', isAdmin, (req, res) => {
   const bal = parseFloat(req.body.balance);
   if (isNaN(bal) || bal < 0) return res.status(400).send('余额不合法');
@@ -1085,7 +1333,6 @@ app.post('/admin/shops/:id/unban', isAdmin, (req, res) => {
       });
     });
   });
-});
 
 app.get('/admin/reports', isAdmin, (req, res) => {
     db.all('SELECT r.*, u.username as reporter_name FROM reports r JOIN users u ON r.reporter_id = u.id ORDER BY r.created_at DESC', (err, reports) => {
@@ -1202,6 +1449,151 @@ app.post('/admin/reports/:id/reject', isAdmin, (req, res) => {
     if (err) return res.status(500).send('数据库错误');
     res.redirect('/admin/reports');
   });
+});
+
+
+// ========== 仓库管理 ==========
+app.get('/shop/warehouses', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.status(404).send('你还没有店铺');
+    db.all('SELECT * FROM warehouses WHERE shop_id = ? ORDER BY id DESC', [shop.id], (err, whs) => {
+      res.render('shop_warehouses', { shop, warehouses: whs || [] });
+    });
+  });
+});
+
+app.post('/shop/warehouses/add', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.redirect('/shop');
+    const name = sanitize(req.body.name || '默认仓库');
+    const address = sanitize(req.body.address || '');
+    const city = sanitize(req.body.city || '');
+    db.run('INSERT INTO warehouses (shop_id, name, address, city) VALUES (?, ?, ?, ?)', [shop.id, name, address, city], () => res.redirect('/shop/warehouses'));
+  });
+});
+
+app.post('/shop/warehouses/delete/:id', isAuth, (req, res) => {
+  db.run('DELETE FROM warehouses WHERE id = ?', [req.params.id], () => res.redirect('/shop/warehouses'));
+});
+
+// ========== 商家发货 ==========
+app.post('/shop/ship/:order_id', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.redirect('/shop');
+    const oid = req.params.order_id;
+    db.get('SELECT * FROM orders WHERE id = ?', [oid], (err, order) => {
+      if (err || !order) return res.redirect('/shop/manage');
+      const warehouseId = parseInt(req.body.warehouse_id) || 0;
+      const carrier = sanitize(req.body.carrier || '邮政');
+      const speed = sanitize(req.body.speed || '标准');
+      const prefix = { '邮政': 'YZ', '中通': 'ZT', '顺丰陆运': 'SF', '顺丰空运': 'SF' }[carrier] || 'KD';
+      const tracking = prefix + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+      const weight = parseFloat(req.body.weight) || 1;
+      db.get('SELECT city FROM users WHERE id = ?', [order.user_id], (err2, user) => {
+        db.get('SELECT city FROM warehouses WHERE id = ?', [warehouseId], (err3, wh) => {
+          let dist = 500;
+          const from = wh ? wh.city : '';
+          const to = user ? user.city : '';
+          if (from && to && cityCoord[from] && cityCoord[to]) {
+            dist = getDistanceKM(cityCoord[from].lat, cityCoord[from].lon, cityCoord[to].lat, cityCoord[to].lon);
+          }
+          const speedKmh = { '顺丰空运': 500, '顺丰陆运': 70, '中通': 50, '邮政': 30 }[carrier] || 40;
+          const base = Math.ceil(dist / speedKmh);
+          const processing = 2 + Math.floor(Math.random() * 5);
+          const variance = Math.floor(base * (Math.random() * 0.4 - 0.2));
+          const hours = Math.max(6, base + processing + variance);
+          const shippingFee = calcShippingFee(carrier, weight, dist);
+          const d = new Date(Date.now() + hours * 3600000);
+          const p = n => String(n).padStart(2, '0');
+          const deliverAt = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+          db.run('UPDATE orders SET status = ? WHERE id = ?', ['shipped', oid]);
+          db.run('UPDATE users SET balance = balance - ? WHERE id = ?', [shippingFee, order.user_id]);
+          db.run(`INSERT INTO shipments (order_id, warehouse_id, carrier, speed, tracking_number, weight, estimate_hours, deliver_at, shipping_fee, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'shipped')`,
+            [oid, warehouseId, carrier, speed, tracking, weight, hours, deliverAt, shippingFee], (err) => {
+              if (err) return res.redirect('/shop/manage');
+              db.run("INSERT INTO notifications (user_id, title, content, type) VALUES (?, '📦 订单已发货', ?, 'ship')",
+                [order.user_id, `订单 ${oid} 已由${carrier}(${speed})发货，单号：${tracking}，距离${dist}km，运费¥${shippingFee}，预计${hours}小时送达`]);
+              res.redirect('/shop/manage');
+            });
+        });
+      });
+    });
+  });
+});
+
+// ========== 快递单号查询入口 ==========
+app.get('/track', isAuth, (req, res) => {
+  res.render('track_search', { msg: null });
+});
+
+app.post('/track', isAuth, (req, res) => {
+  const tracking = sanitize((req.body.tracking_number || '').trim().toUpperCase());
+  if (!tracking) return res.render('track_search', { msg: '请输入快递单号' });
+  db.get('SELECT order_id FROM shipments WHERE tracking_number = ?', [tracking], (err, row) => {
+    if (err || !row) return res.render('track_search', { msg: '未找到该快递单号' });
+    res.redirect('/orders/' + row.order_id + '/track');
+  });
+});
+
+// ========== 快递追踪 ==========
+app.get('/orders/:id/track', isAuth, (req, res) => {
+  const oid = req.params.id;
+  db.get(`SELECT s.*, o.user_id, o.price, p.name as product_name 
+    FROM shipments s JOIN orders o ON s.order_id = o.id 
+    JOIN products p ON o.product_id = p.id 
+    WHERE s.order_id = ?`, [oid], (err, ship) => {
+    if (err || !ship) return res.status(404).send('物流信息不存在');
+    if (ship.user_id !== req.session.user.id && !req.session.user.isAdmin) return res.status(403).send('无权查看');
+    const now = new Date();
+    const deliverAt = new Date(ship.deliver_at);
+    const remainMs = deliverAt - now;
+    const remainHours = remainMs > 0 ? Math.max(0, Math.floor(remainMs / 3600000)) : 0;
+    const remainMinutes = remainMs > 0 ? Math.max(0, Math.floor((remainMs % 3600000) / 60000)) : 0;
+    const isDelivered = remainMs <= 0 && ship.status === 'shipped';
+    if (isDelivered) {
+      db.run('UPDATE shipments SET status = ? WHERE id = ?', ['delivered', ship.id]);
+      ship.status = 'delivered';
+    }
+    res.render('track', { ship, remainHours, remainMinutes, isDelivered, isAdmin: !!req.session.user.isAdmin });
+  });
+});
+
+// ========== 签收 ==========
+app.post('/orders/:id/sign', isAuth, (req, res) => {
+  const oid = req.params.id;
+  db.get('SELECT * FROM shipments WHERE order_id = ?', [oid], (err, ship) => {
+    if (err || !ship) return res.status(404).send('物流不存在');
+    db.run("UPDATE shipments SET status = 'signed', signed_at = datetime('now','localtime') WHERE order_id = ?", [oid]);
+    db.run("UPDATE orders SET status = 'completed' WHERE id = ?", [oid]);
+    res.redirect('/orders/' + oid + '/track');
+  });
+});
+
+// ========== 退货 ==========
+app.post('/orders/:id/return', isAuth, (req, res) => {
+  const oid = req.params.id;
+  const reason = sanitize(req.body.reason || '');
+  db.get('SELECT * FROM shipments WHERE order_id = ?', [oid], (err, ship) => {
+    if (err || !ship) return res.status(404).send('物流不存在');
+    db.run("UPDATE shipments SET status = 'returning', return_reason = ? WHERE order_id = ?", [reason, oid]);
+    db.run("UPDATE orders SET status = 'returning' WHERE id = ?", [oid]);
+    db.run("INSERT INTO refunds (order_id, user_id, reason, amount, status) VALUES (?, ?, ?, ?, 'pending')",
+      [oid, req.session.user.id, reason, 0]);
+    res.redirect('/orders/' + oid + '/track');
+  });
+});
+
+// ========== 系统自动发货 ==========
+app.post('/system/ship/:order_id', isAdmin, (req, res) => {
+  const oid = req.params.order_id;
+  const hours = 24 + Math.floor(Math.random() * 120);
+  const d = new Date(Date.now() + hours * 3600000);
+  const p = n => String(n).padStart(2, '0');
+  const deliverAt = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  const tracking = 'YZ' + Date.now().toString(36).toUpperCase();
+  db.run('UPDATE orders SET status = ? WHERE id = ?', ['shipped', oid]);
+  db.run("INSERT INTO shipments (order_id, warehouse_id, carrier, speed, tracking_number, weight, estimate_hours, deliver_at, status) VALUES (?, 0, '邮政', '标准', ?, 1, ?, ?, 'shipped')",
+    [oid, tracking, hours, deliverAt], () => res.redirect('/admin/orders'));
 });
 
 app.use((err, req, res, next) => {

@@ -54,6 +54,9 @@
     .card.order-card .ico{background:linear-gradient(135deg,#f59e0b,#d97706)}
     .card.chat-card .ico{background:linear-gradient(135deg,#8b5cf6,#7c3aed)}
     .card.monitor-card .ico{background:linear-gradient(135deg,#06b6d4,#0891b2)}
+    .card.refund-card .ico{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    .card.flash-card .ico{background:linear-gradient(135deg,#f59e0b,#d97706)}
+    .card.coupon-card .ico{background:linear-gradient(135deg,#8b5cf6,#7c3aed)}
     .notice{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
     .notice h3{font-size:15px;font-weight:600;margin-bottom:12px;color:#374151;display:flex;align-items:center;gap:8px}
     .notice ul{list-style:none;padding:0}
@@ -77,13 +80,41 @@
         <span class="icon">💸</span>
        <span class="text">退款管理</span>
       </a>
-      <a href="/admin/reports">🚩 举报管理</a>
-      <a href="/admin/appeals">📢 申诉管理</a>
-      <a href="/admin/users">👥 用户管理</a>
-      <a href="/admin/products">📦 商品管理</a>
-      <a href="/admin/orders">📋 订单管理</a>
-      <a href="/chat">💬 聊天室</a>
-      <a class="danger" href="/admin/logout">退出</a>
+      <a href="/admin/flash" class="menu-item">
+       <span class="icon">⚡</span>
+       <span class="text">秒杀管理</span>
+      </a>
+      <a href="/admin/coupons" class="menu-item">
+       <span class="icon">🎫</span>
+       <span class="text">优惠券管理</span>
+      </a>
+      <a href="/admin/reports" class="menu-item">
+        <span class="icon">🚩</span>
+        <span class="text">举报管理</span>
+      </a>
+      <a href="/admin/appeals" class="menu-item">
+        <span class="icon">📢</span>
+        <span class="text">申诉管理</span>
+      </a>
+      <a href="/admin/users" class="menu-item">
+        <span class="icon">👥</span>
+        <span class="text">用户管理</span>
+      </a>
+      <a href="/admin/products" class="menu-item">
+        <span class="icon">📦</span>
+        <span class="text">商品管理</span>
+      </a>
+      <a href="/admin/orders" class="menu-item">
+        <span class="icon">📋</span>
+        <span class="text">订单管理</span>
+      </a>
+      <a href="/chat" class="menu-item">
+        <span class="icon">💬</span>
+        <span class="text">聊天室</span>
+      </a>
+      <a class="danger" href="/admin/logout" class="menu-item">
+        <span class="icon">退出</span>
+      </a>
     </nav>
   </div>
 
@@ -127,7 +158,7 @@
         <div class="ico">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
         </div>
-        <h3>🚩 举报管理中心</h3>
+        <h3>🚩 举报管理</h3>
         <p>查看并处理所有用户提交的举报</p>
         <span class="tag">进入举报管理 →</span>
       </a>
@@ -135,8 +166,8 @@
         <div class="ico">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         </div>
-        <h3>📢 申诉管理中心</h3>
-        <p>处理用户提交的账号、店铺申诉，支持通过/驳回并自动解封</p>
+        <h3>📢 申诉管理</h3>
+        <p>处理用户提交的账号、店铺申诉</p>
         <span class="tag">进入申诉管理 →</span>
       </a>
       <a href="/admin/users" class="card user-card">
@@ -144,7 +175,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         </div>
         <h3>👥 用户管理</h3>
-        <p>管理平台用户，支持封禁/解封、调整余额、信誉分恢复与警告解除</p>
+        <p>管理平台用户，封禁/解封、调整余额</p>
         <span class="tag">进入用户管理 →</span>
       </a>
       <a href="/admin/products" class="card product-card">
@@ -171,21 +202,25 @@
         <p>进入管理员视角的公共聊天区</p>
         <span class="tag">进入聊天室 →</span>
       </a>
-      <a href="/dashboard" class="card monitor-card">
-        <div class="ico">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <h3>🛡️ 安全监控</h3>
-        <p>实时检测 XSS、SQL 注入等攻击行为</p>
-        <span class="tag">进入监控面板 →</span>
+      <a href="/admin/refunds" class="card refund-card">
+        <div class="ico">💸</div>
+        <h3>退款管理</h3>
+        <p>处理退款申请，通过/驳回</p>
+        <span class="tag">进入退款管理 →</span>
+      </a>
+      <a href="/admin/flash" class="card flash-card">
+        <div class="ico">⚡</div>
+        <h3>秒杀管理</h3>
+        <p>创建限时秒杀活动</p>
+        <span class="tag">进入秒杀管理 →</span>
+      </a>
+      <a href="/admin/coupons" class="card coupon-card">
+        <div class="ico">🎫</div>
+        <h3>优惠券管理</h3>
+        <p>创建和管理平台优惠券</p>
+        <span class="tag">进入优惠券管理 →</span>
       </a>
     </div>
-    <div class="quick-entry">
-        <h3>💸 退款管理中心</h3>
-        <p>处理用户提交的退款申请，支持通过/驳回</p>
-        <a href="/admin/refunds" class="btn">进入退款管理 →</a>
-    </div>
-
     <div class="section-title">使用提示</div>
     <div class="notice">
       <h3>📌 管理员日常操作建议</h3>

@@ -19,7 +19,8 @@ db.serialize(() => {
     reputation INTEGER DEFAULT 100,
     warning_until TEXT DEFAULT NULL,
     ban_until TEXT DEFAULT NULL,
-    online INTEGER DEFAULT 0
+    online INTEGER DEFAULT 0,
+    city TEXT DEFAULT ''
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS products (

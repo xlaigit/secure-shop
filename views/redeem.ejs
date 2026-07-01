@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>兑换中心 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:.15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white}
+    .container{max-width:800px;margin:0 auto;padding:24px}
+    .card{background:white;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .redeem-box{display:flex;gap:10px;margin-top:12px}
+    .redeem-box input{flex:1;padding:12px 16px;border:2px solid #e5e7eb;border-radius:12px;font-size:16px;font-family:monospace;text-transform:uppercase;letter-spacing:2px;outline:none}
+    .redeem-box input:focus{border-color:#8b5cf6}
+    .redeem-box button{padding:12px 28px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
+    .redeem-box button:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(139,92,246,.3)}
+    .msg{padding:12px 16px;border-radius:10px;margin-top:12px;font-size:14px;font-weight:500}
+    .msg-success{background:#ecfdf5;color:#065f46;border:2px solid #a7f3d0}
+    .msg-error{background:#fef2f2;color:#991b1b;border:2px solid #fecaca}
+    .coupon-list{display:grid;gap:10px}
+    .coupon-item{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:2px solid #c4b5fd;border-radius:12px;padding:14px 18px;transition:.15s}
+    .coupon-item:hover{border-color:#8b5cf6}
+    .coupon-item.used{opacity:.5;background:#f3f4f6;border-color:#e5e7eb}
+    .coupon-info h4{font-size:15px;margin-bottom:2px}
+    .coupon-info .code{font-family:monospace;font-size:12px;color:#6b7280;background:#e5e7eb;padding:1px 6px;border-radius:4px}
+    .coupon-discount{font-size:20px;font-weight:700;color:#7c3aed}
+    .coupon-discount span{font-size:12px;font-weight:400}
+    .empty{text-align:center;padding:40px;color:#9ca3af}
+    .empty .icon{font-size:48px;margin-bottom:10px}
+    .tip{font-size:13px;color:#6b7280;margin-top:8px;line-height:1.6}
+    .section-title{font-size:17px;font-weight:700;margin-bottom:14px}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <span class="brand">🎫 兑换中心</span>
+    <div>
+      <a href="/shop">🛒 商城</a>
+      <a href="/orders">📋 订单</a>
+      <a href="/redeem" class="active">🎫 兑换</a>
+      <a href="/billing">💰 账单</a>
+      <a href="/logout">退出</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2 style="margin-bottom:4px">🎫 兑换优惠券</h2>
+      <p class="tip">输入管理员或商家发放的兑换码，领取折扣券。购买时输入优惠码即可使用。</p>
+      <form method="POST" action="/redeem">
+        <div class="redeem-box">
+          <input type="text" name="code" placeholder="输入兑换码，如 SAVE20" required autofocus>
+          <button type="submit">兑换</button>
+        </div>
+      </form>
+      <% if (msg) { %>
+        <div class="msg <%= msg.includes('成功') ? 'msg-success' : 'msg-error' %>"><%= msg %></div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">📋 我的优惠券</h3>
+      <% if (!coupons || coupons.length === 0) { %>
+        <div class="empty">
+          <div class="icon">🎫</div>
+          <p>还没有优惠券，快去兑换吧</p>
+        </div>
+      <% } else { %>
+      <div class="coupon-list">
+        <% coupons.forEach(function(c) { %>
+        <% var expired = new Date(c.expires_at) < new Date(); %>
+        <div class="coupon-item <%= c.used || expired ? 'used' : '' %>">
+          <div class="coupon-info">
+            <h4><%= c.used ? '已使用' : (expired ? '已过期' : '可使用') %></h4>
+            <div><span class="code"><%= c.code %></span></div>
+            <div style="font-size:12px;color:#6b7280;margin-top:4px;">
+              <%= c.product_name ? '仅限：' + c.product_name : '全场通用' %>
+              &nbsp;·&nbsp; 过期：<%= c.expires_at %>
+            </div>
+          </div>
+          <div class="coupon-discount">-<%= c.discount %>%<span>OFF</span></div>
+        </div>
+        <% }) %>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

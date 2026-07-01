@@ -112,6 +112,8 @@
       <a href="/appeal">📝 申诉</a>
       <a href="/profile">👤 头像</a>
       <a class="danger" href="/logout">退出</a>
+      <a href="/redeem">兑换</a>
+      <a href="/track">📦 查快递</a>
     </div>
   </div>
 
@@ -166,6 +168,37 @@
       </div>
     </div>
 
+        <% if (typeof flashSales !== 'undefined' && flashSales.length > 0) { %>
+        <div style="margin-bottom:24px;">
+          <h2 style="font-size:20px;font-weight:700;margin-bottom:12px;">
+              ⚡ 限时秒杀 <span style="background:#ef4444;color:white;padding:2px 8px;border-radius:6px;font-size:12px;">HOT</span>
+          </h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">
+             <% flashSales.forEach(function(f) { %>
+              <div style="background:linear-gradient(135deg,#fef2f2,#fff7ed);border:2px solid #fca5a5;border-radius:14px;padding:16px;position:relative;">
+                <div style="position:absolute;top:0;right:0;background:#ef4444;color:white;padding:4px 12px;border-radius:0 14px 0 14px;font-size:12px;font-weight:700;">秒杀</div>
+                <div class="flash-timer" data-end="<%= f.end_time %>" style="font-size:13px;color:#dc2626;font-weight:600;margin-bottom:8px;">
+                  ⏱ <span class="countdown">加载中...</span>
+                </div>
+                <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#111827;"><%= f.name %></div>
+                <div style="margin-bottom:10px;">
+                 <span style="font-size:22px;font-weight:700;color:#ef4444;">¥<%= f.flash_price %></span>
+                 <span style="font-size:14px;color:#9ca3af;text-decoration:line-through;margin-left:8px;">¥<%= f.original_price %></span>
+                 <span style="background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:4px;font-size:12px;margin-left:6px;">-<%= Math.round((1 - f.flash_price / f.original_price) * 100) %>%</span>
+               </div>
+                 <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">仅剩 <strong style="color:#ef4444;"><%= f.stock %></strong> 件</div>
+                 <form action="/buy" method="POST">
+                 <input type="hidden" name="product_id" value="<%= f.product_id %>">
+                             <input type="text" name="coupon" placeholder="优惠码（选填）" style="width:100%;padding:8px;border:2px solid #e5e7eb;border-radius:8px;font-size:13px;margin-bottom:8px;text-transform:uppercase;">
+                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                 <button type="submit" style="width:100%;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:10px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">⚡ 立即抢购</button>
+                </form>
+              </div>
+              <% }) %>
+             </div>
+            </div>
+          <% } %>
+
     <div class="section-header">
       <div>
         <h1>🔥 商品列表</h1>
@@ -199,6 +232,7 @@
               <form action="/buy" method="POST" style="flex:1">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="product_id" value="<%= p.id %>">
+                <input type="text" name="coupon" placeholder="优惠码（选填）" style="width:100%;padding:6px 8px;border:2px solid #e5e7eb;border-radius:8px;font-size:12px;margin-bottom:4px;text-transform:uppercase;">
                 <button type="submit" class="btn btn-buy" style="width:100%">立即购买</button>
               </form>
             </div>
@@ -224,6 +258,61 @@
       })();
     </script>
     <% } %>
+
+    <% if (typeof shipments !== 'undefined' && shipments.length > 0) { %>
+    <div style="margin-top:24px">\server.js:341
+});
+^
+
+SyntaxError: Unexpected token '}'
+    at internalCompileFunction (node:internal/vm:73:18)
+    at wrapSafe (node:internal/modules/cjs/loader:1176:20)
+    at Module._compile (node:internal/modules/cjs/loader:1218:27)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1308:10)
+    at Module.load (node:internal/modules/cjs/loader:1117:32)
+    at Module._load (node:internal/modules/cjs/loader:958:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:81:12)
+    at node:internal/main/run_main_module:23:47
+
+      <h3 style="font-size:18px;margin-bottom:12px">📦 快递追踪</h3>
+      <% shipments.forEach(function(s) { %>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6">
+          <div>
+            <strong><%= s.product_name %></strong>
+            <span style="color:#6b7280;margin-left:8px;font-size:13px"><%= s.carrier %> · <%= s.tracking_number %></span>
+            <span style="color:#6b7280;margin-left:8px;font-size:13px">运费¥<%= s.shipping_fee || 0 %></span>
+          </div>
+          <div>
+            <% if (s.status === 'shipped') { %><span style="color:#f59e0b;font-weight:600">🚚 运输中</span>
+            <% } else if (s.status === 'delivered') { %><span style="color:#10b981;font-weight:600">📬 已送达</span>
+            <% } %>
+            <a href="/orders/<%= s.order_id %>/track" style="margin-left:12px;color:#4338ca;text-decoration:none;font-size:13px">查看→</a>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+    <% } %>
   </div>
+
+  <script>
+  (function(){
+   document.querySelectorAll('.flash-timer').forEach(function(el){
+    var end = new Date(el.dataset.end).getTime();
+    var span = el.querySelector('.countdown');
+    if(!span) return;
+    function tick(){
+      var left = end - Date.now();
+      if(left <= 0){ span.textContent = '已结束'; return; }
+      var h = Math.floor(left / 3600000);
+      var m = Math.floor((left % 3600000) / 60000);
+      var s = Math.floor((left % 60000) / 1000);
+      span.textContent = h + '时' + m + '分' + s + '秒';
+      setTimeout(tick, 1000);
+    }
+    tick();
+   });
+ })();
+ </script>
+
 </body>
 </html>

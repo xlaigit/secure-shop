@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>仓库管理 - <%= shop.name %></title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
+    .container{max-width:800px;margin:0 auto;padding:20px}
+    .header{background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:24px;border-radius:16px;margin-bottom:20px}
+    .header h1{font-size:22px;margin-bottom:4px}
+    .card{background:white;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .card h3{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .form-row{display:flex;gap:10px;flex-wrap:wrap}
+    .form-row input{flex:1;min-width:140px;padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit}
+    .form-row input:focus{outline:none;border-color:#667eea}
+    .btn{padding:10px 18px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+    .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:white}
+    .btn-danger{background:#fee2e2;color:#dc2626}
+    .wh-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6}
+    .wh-item:last-child{border-bottom:none}
+    .wh-info{flex:1}
+    .wh-name{font-weight:600;font-size:15px}
+    .wh-addr{font-size:13px;color:#6b7280}
+    .back{display:inline-block;margin-bottom:16px;color:#667eea;text-decoration:none;font-size:14px;font-weight:500}
+    .empty{text-align:center;padding:40px;color:#9ca3af}
+  </style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="/shop/manage">← 返回店铺管理</a>
+  <div class="header">
+    <h1>🏭 仓库管理</h1>
+    <p style="opacity:0.85"><%= shop.name %></p>
+  </div>
+  <div class="card">
+    <h3>➕ 添加仓库</h3>
+    <form method="POST" action="/shop/warehouses/add" class="form-row">
+      <input name="name" placeholder="仓库名称（如：上海仓）" required>
+      <input name="address" placeholder="地址（选填）">
+      <input name="city" list="cityList" placeholder="仓库所在城市" style="flex:1;min-width:140px;padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit" autocomplete="off">
+      <select name="city" style="flex:1;min-width:140px;padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit">
+        <option value="">选择城市</option>
+        <option value="北京">北京</option>
+        <option value="上海">上海</option>
+        <option value="广州">广州</option>
+        <option value="深圳">深圳</option>
+        <option value="杭州">杭州</option>
+        <option value="成都">成都</option>
+        <option value="武汉">武汉</option>
+        <option value="南京">南京</option>
+        <option value="重庆">重庆</option>
+        <option value="天津">天津</option>
+        <option value="西安">西安</option>
+        <option value="长沙">长沙</option>
+        <option value="郑州">郑州</option>
+        <option value="苏州">苏州</option>
+        <option value="厦门">厦门</option>
+      </select>
+      <button type="submit" class="btn btn-primary">添加</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>📋 仓库列表</h3>
+    <% if (warehouses.length === 0) { %>
+      <div class="empty">暂无仓库，请添加</div>
+    <% } else { %>
+      <% warehouses.forEach(function(w) { %>
+        <div class="wh-item">
+          <div class="wh-info">
+            <div class="wh-name"><%= w.name %></div>
+            <div class="wh-addr"><%= w.address || '未填写地址' %></div>
+          </div>
+          <form method="POST" action="/shop/warehouses/delete/<%= w.id %>" onsubmit="return confirm('确定删除该仓库？')">
+            <button class="btn btn-danger">删除</button>
+          </form>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</div>
+<datalist id="cityList">
+<option value="北京"><option value="天津"><option value="上海"><option value="重庆">
+<option value="石家庄"><option value="唐山"><option value="秦皇岛"><option value="邯郸"><option value="邢台"><option value="保定"><option value="张家口"><option value="承德"><option value="沧州"><option value="廊坊"><option value="衡水">
+<option value="太原"><option value="大同"><option value="朔州"><option value="忻州"><option value="阳泉"><option value="吕梁"><option value="晋中"><option value="长治"><option value="晋城"><option value="临汾"><option value="运城">
+<option value="呼和浩特"><option value="包头"><option value="乌海"><option value="赤峰"><option value="通辽"><option value="鄂尔多斯">
+<option value="沈阳"><option value="大连"><option value="鞍山"><option value="抚顺"><option value="本溪"><option value="丹东"><option value="锦州"><option value="营口">
+<option value="长春"><option value="吉林"><option value="四平"><option value="辽源"><option value="通化">
+<option value="哈尔滨"><option value="齐齐哈尔"><option value="鸡西"><option value="鹤岗"><option value="大庆">
+<option value="南京"><option value="无锡"><option value="徐州"><option value="常州"><option value="苏州"><option value="南通"><option value="连云港"><option value="淮安"><option value="盐城"><option value="扬州"><option value="镇江"><option value="泰州"><option value="宿迁">
+<option value="杭州"><option value="宁波"><option value="温州"><option value="嘉兴"><option value="湖州"><option value="绍兴"><option value="金华"><option value="衢州"><option value="舟山"><option value="台州"><option value="丽水">
+<option value="合肥"><option value="芜湖"><option value="蚌埠"><option value="淮南"><option value="马鞍山"><option value="淮北"><option value="铜陵"><option value="安庆"><option value="黄山"><option value="滁州"><option value="阜阳"><option value="宿州"><option value="六安"><option value="亳州"><option value="池州"><option value="宣城">
+<option value="福州"><option value="厦门"><option value="莆田"><option value="三明"><option value="泉州"><option value="漳州"><option value="南平"><option value="龙岩"><option value="宁德">
+<option value="南昌"><option value="景德镇"><option value="萍乡"><option value="九江"><option value="新余"><option value="鹰潭"><option value="赣州"><option value="吉安"><option value="宜春"><option value="抚州"><option value="上饶">
+<option value="济南"><option value="青岛"><option value="淄博"><option value="枣庄"><option value="东营"><option value="烟台"><option value="潍坊"><option value="济宁"><option value="泰安"><option value="威海"><option value="日照"><option value="临沂"><option value="德州"><option value="聊城"><option value="滨州"><option value="菏泽">
+<option value="郑州"><option value="开封"><option value="洛阳"><option value="平顶山"><option value="安阳"><option value="鹤壁"><option value="新乡"><option value="焦作"><option value="濮阳"><option value="许昌"><option value="漯河"><option value="三门峡"><option value="南阳"><option value="商丘"><option value="信阳"><option value="周口"><option value="驻马店">
+<option value="武汉"><option value="黄石"><option value="十堰"><option value="宜昌"><option value="襄阳"><option value="鄂州"><option value="荆门"><option value="孝感"><option value="荆州"><option value="黄冈"><option value="咸宁"><option value="随州">
+<option value="长沙"><option value="株洲"><option value="湘潭"><option value="衡阳"><option value="邵阳"><option value="岳阳"><option value="常德"><option value="张家界"><option value="益阳"><option value="郴州"><option value="永州"><option value="怀化"><option value="娄底">
+<option value="广州"><option value="深圳"><option value="珠海"><option value="汕头"><option value="佛山"><option value="韶关"><option value="湛江"><option value="肇庆"><option value="江门"><option value="茂名"><option value="惠州"><option value="梅州"><option value="汕尾"><option value="河源"><option value="阳江"><option value="清远"><option value="东莞"><option value="中山"><option value="潮州"><option value="揭阳"><option value="云浮">
+<option value="南宁"><option value="柳州"><option value="桂林"><option value="梧州"><option value="北海"><option value="防城港"><option value="钦州"><option value="贵港"><option value="玉林"><option value="百色"><option value="贺州"><option value="河池"><option value="来宾"><option value="崇左">
+<option value="海口"><option value="三亚">
+<option value="成都"><option value="自贡"><option value="攀枝花"><option value="泸州"><option value="德阳"><option value="绵阳"><option value="广元"><option value="遂宁"><option value="内江"><option value="乐山"><option value="南充"><option value="眉山"><option value="宜宾"><option value="广安"><option value="达州"><option value="雅安"><option value="巴中"><option value="资阳">
+<option value="贵阳"><option value="六盘水"><option value="遵义"><option value="安顺"><option value="毕节">
+<option value="昆明"><option value="曲靖"><option value="玉溪"><option value="保山"><option value="昭通"><option value="丽江"><option value="普洱"><option value="临沧"><option value="西双版纳"><option value="大理">
+<option value="西安"><option value="铜川"><option value="宝鸡"><option value="咸阳"><option value="渭南"><option value="延安"><option value="汉中"><option value="榆林"><option value="安康"><option value="商洛">
+<option value="兰州"><option value="嘉峪关"><option value="金昌"><option value="白银"><option value="天水"><option value="武威"><option value="张掖"><option value="平凉"><option value="酒泉"><option value="庆阳"><option value="定西"><option value="陇南">
+<option value="西宁">
+<option value="银川"><option value="石嘴山"><option value="吴忠"><option value="固原"><option value="中卫">
+<option value="乌鲁木齐"><option value="克拉玛依">
+<option value="香港"><option value="澳门"><option value="台北">
+</datalist>
+</body>
+</html>
