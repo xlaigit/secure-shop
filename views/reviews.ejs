@@ -22,6 +22,8 @@
     .product-card .meta{color:#6b7280;font-size:14px;margin-bottom:4px}
     .product-card .price{font-size:22px;font-weight:700;color:#667eea;margin-top:8px}
     .product-card .price::before{content:'¥';font-size:16px;margin-right:2px}
+    .avg-rating{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:14px;color:#f59e0b}
+    .avg-rating .num{color:#6b7280;font-size:13px;margin-left:2px}
     .section-title{font-size:18px;font-weight:700;margin:24px 0 16px;display:flex;align-items:center;gap:8px}
     .section-title::before{content:'';width:4px;height:18px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:2px}
     .review-form{background:white;border-radius:20px;padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.04);margin-bottom:24px}
@@ -37,12 +39,14 @@
     .btn-submit:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(102,126,234,0.3)}
     .btn-submit:disabled{opacity:0.6;cursor:not-allowed;transform:none;box-shadow:none}
     .review-list{display:flex;flex-direction:column;gap:16px}
-    .review-item{background:white;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
-    .review-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .review-item{background:white;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;gap:14px}
+    .review-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px}
+    .review-body{flex:1}
+    .review-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
     .reviewer{font-weight:600;color:#1f2937;font-size:15px}
-    .stars-display{color:#f59e0b;font-size:16px;letter-spacing:2px}
-    .review-comment{color:#4b5563;font-size:14px;line-height:1.6;margin-top:8px}
-    .review-time{font-size:12px;color:#9ca3af;margin-top:10px}
+    .stars-display{color:#f59e0b;font-size:15px;letter-spacing:2px}
+    .review-comment{color:#4b5563;font-size:14px;line-height:1.6;margin-top:6px}
+    .review-time{font-size:12px;color:#9ca3af;margin-top:8px}
     .empty-state{text-align:center;padding:40px;background:white;border-radius:20px;color:#6b7280}
     .empty-state .ico{font-size:48px;margin-bottom:12px}
     .empty-state h3{font-size:18px;font-weight:600;margin-bottom:6px;color:#1f2937}
@@ -69,6 +73,9 @@
         <h1><%= product.name %></h1>
         <div class="meta"><%= product.shop_id ? '商家商品' : '官方正品' %> | 库存: <%= product.stock %></div>
         <div class="price"><%= product.price %></div>
+        <% if (typeof avgRating !== 'undefined' && avgRating > 0) { %>
+          <div class="avg-rating"><%= '★'.repeat(Math.round(avgRating)) %><span class="num"><%= avgRating %> 分 (<%= reviews.length %>评)</span></div>
+        <% } %>
       </div>
     </div>
 
@@ -108,12 +115,19 @@
       <div class="review-list">
         <% reviews.forEach(function(r) { %>
           <div class="review-item">
+            <% if (r.avatar && r.avatar.length > 0) { %>
+              <img class="review-avatar" src="<%= r.avatar %>" alt="<%= r.username %>">
+            <% } else { %>
+              <div class="review-avatar"><%= r.username.charAt(0).toUpperCase() %></div>
+            <% } %>
+            <div class="review-body">
             <div class="review-header">
-              <span class="reviewer">👤 <%= r.username %></span>
+              <span class="reviewer"><%= r.username %></span>
               <span class="stars-display"><%= '★'.repeat(r.rating) %><%= '☆'.repeat(5 - r.rating) %></span>
             </div>
             <div class="review-comment"><%= r.comment %></div>
             <div class="review-time"><%= r.created_at %></div>
+            </div>
           </div>
         <% }) %>
       </div>

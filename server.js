@@ -28,14 +28,51 @@ const http = require('http');
 const fs = require('fs');
 const socketio = require('socket.io');
 const crypto = require('crypto');
+const url = require('url');
+
+// ========== SSRF 防护：阻止访问内网、本地、云元数据地址 ==========
+const BLOCKED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', '[::1]', '::1'];
+const BLOCKED_CIDR = [
+  { prefix: '10.', mask: 8 },
+  { prefix: '172.16.', mask: 12, end: '172.31.' },
+  { prefix: '192.168.', mask: 16 }
+];
+function isSafeUrl(targetUrl) {
+  try {
+    const parsed = new url.URL(targetUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    if (BLOCKED_HOSTS.includes(hostname)) return false;
+    for (const cidr of BLOCKED_CIDR) {
+      if (hostname.startsWith(cidr.prefix)) {
+        if (!cidr.end) return false;
+        const num = parseInt(hostname.split('.')[1]);
+        if (num >= 16 && num <= 31) return false;
+        return true;
+      }
+    }
+    return true;
+  } catch (e) { return false; }
+}
 
 const app = express();
 app.set('trust proxy', 1);
 const httpServer = http.createServer(app);
-const io = socketio(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+const io = socketio(httpServer, { cors: { origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], methods: ['GET', 'POST'] } });
 
 app.use(express.static('public'));
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      frameSrc: ["'self'"]
+    }
+  }
+}));
 
 // 登录与注册限流
 const loginLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 20 });
@@ -46,6 +83,7 @@ db.run('UPDATE users SET online = 0');
 
 // 在线用户列表
 const onlineUsers = new Map();
+const allConnections = new Map(); // socketId -> { id, username, page, ip } 所有连接（含访客）
 const attackLog = [];
 const MAX_ATTACK_LOG = 200;
 
@@ -96,8 +134,13 @@ const storage = multer.diskStorage({
   destination: 'public/uploads/',
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
-const chatUpload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+const fileFilter = (req, file, cb) => {
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf', 'text/plain', 'application/zip', 'application/x-zip-compressed'];
+  if (allowed.includes(file.mimetype)) return cb(null, true);
+  cb(new Error('不支持的文件类型'), false);
+};
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
+const chatUpload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
@@ -120,7 +163,7 @@ app.use(session({
     ttl: 86400,
     retries: 0
   }),
-  secret: 'change-this',
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: 'strict', secure: false }
@@ -128,7 +171,7 @@ app.use(session({
 
 const csrfProtection = csurf({ cookie: false });
 app.use((req, res, next) => {
-if (['/chat/upload', '/upload', '/appeal', '/friend/group', '/track'].includes(req.path) || req.path.startsWith('/refund/apply') || req.path.startsWith('/admin/refunds/') || req.path.startsWith('/admin/flash') || req.path.startsWith('/admin/coupons') || req.path.startsWith('/shop/coupons') || req.path.startsWith('/redeem') || req.path.startsWith('/shop/ship') || req.path.startsWith('/shop/warehouses') || req.path.startsWith('/admin/users/balance') || req.path.startsWith('/orders/') && (req.path.includes('/track') || req.path.includes('/sign') || req.path.includes('/return'))) return next();
+if (['/chat/upload', '/upload', '/appeal', '/friend/group', '/track', '/prompt-generator', '/prompt-generator/publish', '/prompt-generator/download'].includes(req.path) || req.path.startsWith('/refund/apply') || req.path.startsWith('/admin/refunds/') || req.path.startsWith('/admin/flash') || req.path.startsWith('/admin/coupons') || req.path.startsWith('/shop/manage') || req.path.startsWith('/shop/coupons') || req.path.startsWith('/shop/product') || req.path.startsWith('/redeem') || req.path.startsWith('/shop/ship') || req.path.startsWith('/shop/warehouses') || req.path.startsWith('/admin/users/balance') || req.path.startsWith('/admin/login') || req.path.startsWith('/login') || req.path.startsWith('/register') || req.path.startsWith('/orders/') && (req.path.includes('/track') || req.path.includes('/sign') || req.path.includes('/return')) || req.path.startsWith('/admin/ai-artworks') || req.path.startsWith('/admin/announcements') || req.path.startsWith('/ai-image/') || req.path.startsWith('/api/') || req.path.startsWith('/socket.io') || req.path.startsWith('/profile')) return next();
   csrfProtection(req, res, next);
 });
 app.use((req, res, next) => {
@@ -137,7 +180,30 @@ app.use((req, res, next) => {
   next();
 });
 
+// 日活统计中间件（必须在 session 之后）
+app.use((req, res, next) => {
+  if (req.path.startsWith('/socket.io') || req.path.startsWith('/uploads') || req.path.startsWith('/favicon')) return next();
+  const today = new Date().toISOString().split('T')[0];
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const userId = req.session.user ? req.session.user.id : null;
+  db.get('SELECT id FROM daily_visits WHERE visit_date = ? AND visitor_ip = ?', [today, ip], (err, row) => {
+    if (!err && !row) {
+      db.run('INSERT INTO daily_visits (visit_date, visitor_ip, user_id) VALUES (?, ?, ?)', [today, ip, userId], function() {
+        db.get('SELECT COUNT(*) as count FROM daily_visits WHERE visit_date = ?', [today], (e, r) => {
+          if (!e) io.emit('dauUpdate', r ? r.count : 0);
+        });
+      });
+    }
+  });
+  db.run('INSERT INTO daily_pv (visit_date, count) VALUES (?, 1) ON CONFLICT(visit_date) DO UPDATE SET count = count + 1', [today]);
+  next();
+});
+
 app.set('view engine', 'ejs');
+app.set('view cache', false);
+const ejs = require('ejs');
+ejs.clearCache();
+app.use((req, res, next) => { ejs.clearCache(); next(); });
 
 function sanitize(str) { return typeof str === 'string' ? validator.escape(validator.trim(str)) : ''; }
 
@@ -315,8 +381,23 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
+app.get('/shop/json', isAuth, (req, res) => {
+  db.all(`SELECT p.*, s.name as shop_name FROM products p LEFT JOIN shops s ON p.shop_id = s.id ORDER BY p.id DESC`, (err, products) => {
+    res.json(products.map(p => ({ id: p.id, name: p.name, shop_id: p.shop_id, shop_name: p.shop_name })));
+  });
+});
+
 app.get('/shop', isAuth, (req, res) => {
-  db.all('SELECT * FROM products ORDER BY id DESC', (err, products) => {
+  db.all(`SELECT p.*, s.name as shop_name,
+    COALESCE(r.avg_rating, 0) as avg_rating,
+    COALESCE(r.review_count, 0) as review_count
+    FROM products p
+    LEFT JOIN shops s ON p.shop_id = s.id
+    LEFT JOIN (
+      SELECT product_id, ROUND(AVG(rating), 1) as avg_rating, COUNT(*) as review_count
+      FROM reviews GROUP BY product_id
+    ) r ON r.product_id = p.id
+    ORDER BY p.id DESC`, (err, products) => {
     if (err) return res.status(500).send('服务器错误');
     db.all(`SELECT f.*, p.name, p.price as original_price 
       FROM flash_sales f JOIN products p ON f.product_id = p.id 
@@ -328,11 +409,14 @@ app.get('/shop', isAuth, (req, res) => {
         JOIN products p ON o.product_id = p.id
         WHERE o.user_id = ? AND s.status IN ('shipped','delivered')
         ORDER BY s.shipped_at DESC LIMIT 5`, [req.session.user.id], (err3, shipments) => {
+        db.all('SELECT * FROM announcements WHERE is_active = 1 ORDER BY id DESC', (err4, announcements) => {
         res.render('shop', { 
           products, flashSales, shipments: shipments || [],
+          announcements: announcements || [],
           balance: req.session.user.balance, 
           warningActive: req.session.user.warningActive, 
           warningUntil: req.session.user.warningUntil 
+        });
         });
       }); 
       });
@@ -409,11 +493,32 @@ app.post('/buy', isAuth, (req, res) => {
             });
           }
 
-          db.run('UPDATE flash_sales SET stock = stock - 1 WHERE product_id = ? AND stock > 0', [product.id]);
+          db.run('UPDATE flash_sales SET stock = stock - 1 WHERE product_id = ? AND stock > 0', [product.id], function() {
+            if (this.changes > 0) {
+              db.get('SELECT stock FROM flash_sales WHERE product_id = ?', [product.id], (e, fs) => {
+                if (!e) io.emit('flashStockUpdate', { productId: product.id, stock: fs ? fs.stock : 0 });
+              });
+            }
+          });
           if (couponId) db.run('UPDATE user_coupons SET used = 1 WHERE coupon_id = ? AND user_id = ?', [couponId, req.session.user.id]);
 
           db.run('COMMIT');
           req.session.user.balance = nb;
+          for (let [sid, u] of onlineUsers) {
+            if (u.id == req.session.user.id) { io.to(sid).emit('balanceUpdate', nb); break; }
+          }
+          io.emit('productStockUpdate', { productId: product.id, stock: product.stock - 1 });
+          // 官方商品自动发货
+          if (product.shop_id === 0) {
+            const tracking = 'YZ' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+            const hours = 24 + Math.floor(Math.random() * 72);
+            const d = new Date(Date.now() + hours * 3600000);
+            const p = n => String(n).padStart(2, '0');
+            const deliverAt = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+            db.run(`INSERT INTO shipments (order_id, carrier, speed, tracking_number, weight, estimate_hours, deliver_at, status) VALUES (?, '邮政', '标准', ?, 1, ?, ?, 'shipped')`,
+              [oid, tracking, hours, deliverAt]);
+            db.run("UPDATE orders SET status = 'shipped' WHERE id = ?", [oid]);
+          }
           res.redirect('/orders');
         });
       });
@@ -580,6 +685,7 @@ app.post('/admin/refunds/:id/:action', isAdmin, (req, res) => {
         
         // 更新订单状态为已退款
         db.run('UPDATE orders SET status = ? WHERE id = ?', ['refunded', refund.order_id]);
+        db.run("UPDATE shipments SET status = 'cancelled' WHERE order_id = ?", [refund.order_id]);
         
         // 通知用户退款成功
         db.run('INSERT INTO notifications (user_id, title, content, type) VALUES (?, ?, ?, ?)', [refund.user_id, '退款成功', `您的退款申请已通过，金额 ¥${refund.amount} 已退回账户`, 'refund']);
@@ -633,8 +739,8 @@ app.post('/profile/address', isAuth, (req, res) => {
 });
 
 app.get('/profile', isAuth, (req, res) => {
-  db.get('SELECT city FROM users WHERE id = ?', [req.session.user.id], (err, row) => {
-    res.render('profile', { msg: null, city: row ? row.city : '' });
+  db.get('SELECT city, avatar FROM users WHERE id = ?', [req.session.user.id], (err, row) => {
+    res.render('profile', { msg: null, city: row ? row.city : '', avatar: row ? row.avatar : '' });
   });
 });
 app.get('/attack-log', isAuth, (req, res) => {
@@ -784,11 +890,17 @@ app.get('/shop/manage', isAuth, (req, res) => {
         WHERE p.shop_id = ? ORDER BY o.created_at DESC`, [shop.id], (err, orders) => {
         db.all('SELECT * FROM products WHERE shop_id = ?', [shop.id], (err2, products) => {
           db.all('SELECT * FROM warehouses WHERE shop_id = ?', [shop.id], (err3, whs) => {
-            res.render('shop_manage', { shop, products, orders: orders || [], warehouses: whs || [], shopWarning, warningUntil: shop.warning_until });
+            db.all('SELECT * FROM product_images WHERE product_id IN (SELECT id FROM products WHERE shop_id = ?)', [shop.id], (err4, images) => {
+            res.render('shop_manage', { shop, products, orders: orders || [], warehouses: whs || [], images: images || [], shopWarning, warningUntil: shop.warning_until });
+            });
           });
-        });
   });
 });
+});
+});
+
+app.post('/shop/manage', isAuth, (req, res) => {
+  res.redirect('/shop/manage');
 });
 
 app.get('/shop/coupons', isAuth, (req, res) => {
@@ -832,7 +944,7 @@ app.post('/shop/product/add', isAuth, (req, res) => {
       const until = Date.parse(shop.warning_until);
       if (!isNaN(until) && until > Date.now()) return res.status(403).send('您的店铺当前处于警告期，暂时无法发布商品');
     }
-    db.run('INSERT INTO products (shop_id, name, price, stock) VALUES (?, ?, ?, ?)', [shop.id, name, price, stock], (err) => {
+    db.run('INSERT INTO products (shop_id, name, price, stock, shipping_policy) VALUES (?, ?, ?, ?, ?)', [shop.id, name, price, stock, parseInt(req.body.shipping_policy) || 0], (err) => {
       if (err) return res.status(500).send('添加失败');
       res.redirect('/shop/manage');
     });
@@ -840,9 +952,39 @@ app.post('/shop/product/add', isAuth, (req, res) => {
 });
 
 app.post('/shop/product/delete/:id', isAuth, (req, res) => {
-  db.get('SELECT id FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
-    if (err || !shop) return res.status(400).send('无权限');
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.redirect('/shop');
     db.run('DELETE FROM products WHERE id = ? AND shop_id = ?', [req.params.id, shop.id], (err) => {
+      db.run('DELETE FROM product_images WHERE product_id = ?', [req.params.id]);
+      res.redirect('/shop/manage');
+    });
+  });
+});
+
+app.post('/shop/product/:id/images', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.redirect('/shop');
+    db.get('SELECT * FROM products WHERE id = ? AND shop_id = ?', [req.params.id, shop.id], (err, product) => {
+      if (err || !product) return res.status(404).send('商品不存在');
+      upload.array('images', 5)(req, res, function(err) {
+        if (err) return res.status(400).send('上传失败：' + err.message);
+        if (!req.files || req.files.length === 0) return res.status(400).send('请选择图片');
+        let done = 0;
+        req.files.forEach((file, i) => {
+          db.run('INSERT INTO product_images (product_id, url, sort_order) VALUES (?, ?, ?)', [product.id, '/uploads/' + file.filename, i], () => {
+            done++;
+            if (done === req.files.length) res.redirect('/shop/manage');
+          });
+        });
+      });
+    });
+  });
+});
+
+app.post('/shop/product/:id/images/delete/:imgId', isAuth, (req, res) => {
+  db.get('SELECT * FROM shops WHERE owner_id = ?', [req.session.user.id], (err, shop) => {
+    if (err || !shop) return res.redirect('/shop');
+    db.run('DELETE FROM product_images WHERE id = ? AND product_id = ?', [req.params.imgId, req.params.id], (err) => {
       res.redirect('/shop/manage');
     });
   });
@@ -856,8 +998,9 @@ app.get('/review/:productId', isAuth, (req, res) => {
     if (req.session.user.warningActive) return res.status(403).send('你当前处于警告期，暂时不能进行店铺评价');
     db.get('SELECT id FROM orders WHERE user_id = ? AND product_id = ? LIMIT 1', [req.session.user.id, req.params.productId], (err, order) => {
       if (err || !order) return res.status(403).send('请先购买该商品后再评价');
-      db.all('SELECT reviews.*, users.username FROM reviews JOIN users ON reviews.user_id = users.id WHERE product_id = ? ORDER BY created_at DESC', [req.params.productId], (err, reviews) => {
-        res.render('reviews', { product, reviews });
+      db.all('SELECT reviews.*, users.username, users.avatar FROM reviews JOIN users ON reviews.user_id = users.id WHERE product_id = ? ORDER BY created_at DESC', [req.params.productId], (err, reviews) => {
+        const avgRating = reviews.length > 0 ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : 0;
+        res.render('reviews', { product, reviews, avgRating });
       });
     });
   });
@@ -958,7 +1101,7 @@ app.post('/admin/login', rateLimit({ windowMs: 1 * 60 * 1000, max: 10 }), (req, 
   db.get('SELECT * FROM users WHERE username = ? AND is_admin = 1', [u], (err, admin) => {
     if (err || !admin) return res.render('admin_login', { error: '管理员账号或密码错误' });
     bcrypt.compare(p, admin.password, (err, ok) => {
-      if (ok) { req.session.user = { id: admin.id, username: admin.username, isAdmin: true }; return res.redirect('/admin/dashboard'); }
+      if (ok) { req.session.user = { id: admin.id, username: admin.username, isAdmin: true }; return req.session.save(() => res.redirect('/admin/dashboard')); }
       res.render('admin_login', { error: '管理员账号或密码错误' });
     });
   });
@@ -1054,18 +1197,25 @@ app.post('/admin/reports/:id/action/delete-product', isAdmin, (req, res) => {
 });
 
 app.get('/admin/dashboard', isAdmin, (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
   db.get('SELECT COUNT(*) AS n FROM users', (err1, u) => {
     db.get('SELECT COUNT(*) AS n FROM products', (err2, p) => {
       db.get('SELECT COUNT(*) AS n FROM orders', (err3, o) => {
         db.get("SELECT COUNT(*) AS n FROM reports WHERE status = 'pending'", (err4, r) => {
           db.get("SELECT COUNT(*) AS n FROM appeals WHERE status = 'pending' OR status IS NULL", (err5, ap) => {
-            res.render('admin_dashboard', {
-              user: req.session.user,
-              userCount: u?.n || 0,
-              productCount: p?.n || 0,
-              orderCount: o?.n || 0,
-              pendingReports: r?.n || 0,
-              pendingAppeals: ap?.n || 0
+            db.get('SELECT COUNT(*) AS n FROM daily_visits WHERE visit_date = ?', [today], (err6, uv) => {
+              db.get('SELECT COALESCE(count, 0) AS n FROM daily_pv WHERE visit_date = ?', [today], (err7, pv) => {
+                res.render('admin_dashboard', {
+                  user: req.session.user,
+                  userCount: u?.n || 0,
+                  productCount: p?.n || 0,
+                  orderCount: o?.n || 0,
+                  pendingReports: r?.n || 0,
+                  pendingAppeals: ap?.n || 0,
+                  todayUV: uv?.n || 0,
+                  todayPV: pv?.n || 0
+                });
+              });
             });
           });
         });
@@ -1392,7 +1542,19 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
 });
 
   // ========== Socket.IO ==========
+  function broadcastOnlineCount() {
+    const uniqueIds = new Set();
+    let guestCount = 0;
+    for (let [sid, u] of allConnections) {
+      if (u.id) uniqueIds.add(u.id);
+      else guestCount++;
+    }
+    io.emit('onlineCount', uniqueIds.size + guestCount);
+  }
   io.on('connection', (socket) => {
+    allConnections.set(socket.id, { id: null, username: '访客', page: '未知', ip: socket.handshake.address });
+    broadcastOnlineCount();
+    io.emit('onlineUsers', Array.from(allConnections.values()).map(u => ({ id: u.id, username: u.username, page: u.page })));
     socket.emit('history', chatHistory.slice(-50));
     socket.on('msg', (data) => {
       const msg = sanitize(data.msg || '').substring(0, 500);
@@ -1406,7 +1568,9 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
     socket.on('login', (user) => {
       if (user && user.id) {
         onlineUsers.set(socket.id, { id: user.id, username: user.username });
-        io.emit('onlineUsers', Array.from(onlineUsers.values()));
+        allConnections.set(socket.id, { id: user.id, username: user.username, page: user.page || '未知', ip: socket.handshake.address });
+        io.emit('onlineUsers', Array.from(allConnections.values()).map(u => ({ id: u.id, username: u.username, page: u.page })));
+        broadcastOnlineCount();
       }
     });
 
@@ -1433,7 +1597,9 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
 
     socket.on('disconnect', () => {
       onlineUsers.delete(socket.id);
-      io.emit('onlineUsers', Array.from(onlineUsers.values()));
+      allConnections.delete(socket.id);
+      io.emit('onlineUsers', Array.from(allConnections.values()).map(u => ({ id: u.id, username: u.username, page: u.page })));
+      broadcastOnlineCount();
     });
   });
 
@@ -1482,10 +1648,11 @@ app.post('/shop/ship/:order_id', isAuth, (req, res) => {
     if (err || !shop) return res.redirect('/shop');
     const oid = req.params.order_id;
     db.get('SELECT * FROM orders WHERE id = ?', [oid], (err, order) => {
-      if (err || !order) return res.redirect('/shop/manage');
+      if (err || !order) return res.status(404).send('订单不存在');
       const warehouseId = parseInt(req.body.warehouse_id) || 0;
       const carrier = sanitize(req.body.carrier || '邮政');
-      const speed = sanitize(req.body.speed || '标准');
+      const speedMap = { '顺丰空运': '特快', '顺丰陆运': '快速', '中通': '标准', '邮政': '标准' };
+      const speed = speedMap[carrier] || '标准';
       const prefix = { '邮政': 'YZ', '中通': 'ZT', '顺丰陆运': 'SF', '顺丰空运': 'SF' }[carrier] || 'KD';
       const tracking = prefix + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
       const weight = parseFloat(req.body.weight) || 1;
@@ -1503,18 +1670,27 @@ app.post('/shop/ship/:order_id', isAuth, (req, res) => {
           const variance = Math.floor(base * (Math.random() * 0.4 - 0.2));
           const hours = Math.max(6, base + processing + variance);
           const shippingFee = calcShippingFee(carrier, weight, dist);
+          db.get('SELECT shipping_policy FROM products WHERE id = ?', [order.product_id], (err4, product) => {
+            if (err4) { console.error('查询运费策略失败:', err4.message); }
+            const policy = product ? (product.shipping_policy || 1) : 1;
+            let buyerPay = shippingFee, merchantPay = 0;
+            if (policy === 0) { buyerPay = 0; merchantPay = shippingFee; }
+            else if (policy === 2) { buyerPay = Math.round(shippingFee * 0.5 * 100) / 100; merchantPay = shippingFee - buyerPay; }
+            const policyLabel = { 0: '包邮', 1: '不包邮', 2: '半包邮' }[policy] || '不包邮';
           const d = new Date(Date.now() + hours * 3600000);
           const p = n => String(n).padStart(2, '0');
           const deliverAt = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
           db.run('UPDATE orders SET status = ? WHERE id = ?', ['shipped', oid]);
-          db.run('UPDATE users SET balance = balance - ? WHERE id = ?', [shippingFee, order.user_id]);
+          db.run('UPDATE users SET balance = balance - ? WHERE id = ?', [buyerPay, order.user_id]);
+          if (merchantPay > 0) db.run('UPDATE users SET balance = balance - ? WHERE id = ?', [merchantPay, shop.owner_id]);
           db.run(`INSERT INTO shipments (order_id, warehouse_id, carrier, speed, tracking_number, weight, estimate_hours, deliver_at, shipping_fee, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'shipped')`,
             [oid, warehouseId, carrier, speed, tracking, weight, hours, deliverAt, shippingFee], (err) => {
-              if (err) return res.redirect('/shop/manage');
+              if (err) return res.status(500).send('发货失败，请重试');
               db.run("INSERT INTO notifications (user_id, title, content, type) VALUES (?, '📦 订单已发货', ?, 'ship')",
-                [order.user_id, `订单 ${oid} 已由${carrier}(${speed})发货，单号：${tracking}，距离${dist}km，运费¥${shippingFee}，预计${hours}小时送达`]);
+                [order.user_id, `订单 ${oid} 已由${carrier}(${speed})发货，单号：${tracking}，距离${dist}km，运费¥${shippingFee}（${policyLabel}，你付¥${buyerPay}），预计${hours}小时送达`]);
               res.redirect('/shop/manage');
             });
+          });
         });
       });
     });
@@ -1596,11 +1772,208 @@ app.post('/system/ship/:order_id', isAdmin, (req, res) => {
     [oid, tracking, hours, deliverAt], () => res.redirect('/admin/orders'));
 });
 
+// ========== AI 图像提示词生成器 ==========
+app.get('/prompt-generator', (req, res) => {
+  res.render('prompt_generator', { user: req.session.user || null });
+});
+
+// 日活统计 API
+app.get('/api/dau', (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  db.get('SELECT COUNT(*) as count FROM daily_visits WHERE visit_date = ?', [today], (err, row) => {
+    if (err) return res.json({ count: 0 });
+    res.json({ count: row ? row.count : 0 });
+  });
+});
+
+// 在线用户列表 API（管理员）
+app.get('/api/online-users', isAdmin, (req, res) => {
+  const users = [];
+  const seen = new Set();
+  for (let [sid, u] of allConnections) {
+    const key = u.id ? 'u' + u.id : 'g' + sid;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    users.push({ id: u.id, username: u.username || '访客', page: u.page || '未知', ip: u.ip || '未知' });
+  }
+  res.json(users);
+});
+
+// PV 统计 API
+app.get('/api/pv', (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  db.get('SELECT COALESCE(count, 0) as count FROM daily_pv WHERE visit_date = ?', [today], (err, row) => {
+    if (err) return res.json({ count: 0 });
+    res.json({ count: row ? row.count : 0 });
+  });
+});
+
+// 最近 7 天访问趋势 API
+app.get('/api/visit-trend', isAdmin, (req, res) => {
+  const dates = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+  db.all('SELECT visit_date, COUNT(*) as uv FROM daily_visits WHERE visit_date >= ? GROUP BY visit_date', [dates[0]], (err, uvRows) => {
+    db.all('SELECT visit_date, count as pv FROM daily_pv WHERE visit_date >= ?', [dates[0]], (err2, pvRows) => {
+      const uvMap = {};
+      (uvRows || []).forEach(r => uvMap[r.visit_date] = r.uv);
+      const pvMap = {};
+      (pvRows || []).forEach(r => pvMap[r.visit_date] = r.pv);
+      const result = dates.map(d => ({ date: d, uv: uvMap[d] || 0, pv: pvMap[d] || 0 }));
+      res.json(result);
+    });
+  });
+});
+
+// ========== 公告管理 ==========
+app.get('/admin/announcements', isAdmin, (req, res) => {
+  db.all('SELECT * FROM announcements ORDER BY id DESC', (err, rows) => {
+    res.render('admin_announcements', { announcements: rows || [] });
+  });
+});
+app.post('/admin/announcements/create', isAdmin, (req, res) => {
+  const title = sanitize(req.body.title || '').trim();
+  const content = sanitize(req.body.content || '').trim();
+  if (!title || !content) return res.redirect('/admin/announcements');
+  db.run('INSERT INTO announcements (title, content) VALUES (?, ?)', [title, content], () => res.redirect('/admin/announcements'));
+});
+app.post('/admin/announcements/toggle/:id', isAdmin, (req, res) => {
+  db.get('SELECT is_active FROM announcements WHERE id = ?', [req.params.id], (err, row) => {
+    if (err || !row) return res.redirect('/admin/announcements');
+    db.run('UPDATE announcements SET is_active = ? WHERE id = ?', [row.is_active ? 0 : 1, req.params.id], () => res.redirect('/admin/announcements'));
+  });
+});
+app.post('/admin/announcements/delete/:id', isAdmin, (req, res) => {
+  db.run('DELETE FROM announcements WHERE id = ?', [req.params.id], () => res.redirect('/admin/announcements'));
+});
+
+// 发布 AI 作品
+app.post('/prompt-generator/publish', isAuth, (req, res) => {
+  const imageUrl = (req.body.image_url || '').trim();
+  if (!imageUrl || !/^https?:\/\//.test(imageUrl)) return res.json({ ok: false, msg: '请先生成图像' });
+  const scene = sanitize(req.body.scene || '');
+  const adjective = sanitize(req.body.adjective || '');
+  const characters = sanitize(req.body.characters || '');
+  const style = sanitize(req.body.style || '');
+  const genre = sanitize(req.body.genre || '');
+  const artist = sanitize(req.body.artist || '');
+  const summary = sanitize(req.body.summary || '');
+  db.run(
+    'INSERT INTO ai_artworks (user_id, username, image_url, prompt_scene, prompt_adjective, prompt_characters, prompt_style, prompt_genre, prompt_artist, summary, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [req.session.user.id, req.session.user.username, imageUrl, scene, adjective, characters, style, genre, artist, summary, 'approved'],
+    function (err) {
+      if (err) return res.json({ ok: false, msg: '发布失败' });
+      res.json({ ok: true, msg: '发布成功！可在画廊中查看' });
+    }
+  );
+});
+
+// 下载/保存 AI 图像到本地
+app.post('/prompt-generator/download', isAuth, (req, res) => {
+  const imageUrl = (req.body.image_url || '').trim();
+  if (!imageUrl || !/^https?:\/\//.test(imageUrl)) return res.json({ ok: false, msg: '无图像URL' });
+  if (!isSafeUrl(imageUrl)) return res.json({ ok: false, msg: '不安全的URL' });
+  const https = require('https');
+  const http = require('http');
+  const protocol = imageUrl.startsWith('https') ? https : http;
+  protocol.get(imageUrl, (imgRes) => {
+    if (imgRes.statusCode !== 200) return res.json({ ok: false, msg: '下载失败' });
+    const filename = 'ai_' + Date.now() + '.jpg';
+    const filepath = path.join(__dirname, 'public', 'uploads', filename);
+    const file = fs.createWriteStream(filepath);
+    imgRes.pipe(file);
+    file.on('finish', () => {
+      file.close();
+      const localUrl = '/uploads/' + filename;
+      db.run('INSERT INTO ai_artworks (user_id, username, image_url, local_path, status) VALUES (?, ?, ?, ?, ?)',
+        [req.session.user.id, req.session.user.username, imageUrl, localUrl, 'approved'],
+        function () {
+          res.json({ ok: true, msg: '保存成功', local_url: localUrl });
+        });
+    });
+    file.on('error', () => res.json({ ok: false, msg: '保存失败' }));
+  }).on('error', () => res.json({ ok: false, msg: '网络请求失败' }));
+});
+
+// AI 作品画廊
+app.get('/prompt-generator/gallery', (req, res) => {
+  db.all('SELECT * FROM ai_artworks WHERE status = ? ORDER BY created_at DESC LIMIT 50', ['approved'], (err, artworks) => {
+    res.render('ai_gallery', { artworks: artworks || [], user: req.session.user || null });
+  });
+});
+
+// ========== 管理员 AI 作品审核 ==========
+app.get('/admin/ai-artworks', isAdmin, (req, res) => {
+  db.all('SELECT * FROM ai_artworks ORDER BY created_at DESC LIMIT 100', (err, artworks) => {
+    res.render('admin_ai_artworks', { artworks: artworks || [] });
+  });
+});
+
+app.post('/admin/ai-artworks/:id/approve', isAdmin, (req, res) => {
+  db.run('UPDATE ai_artworks SET status = ? WHERE id = ?', ['approved', req.params.id], () => {
+    res.redirect('/admin/ai-artworks');
+  });
+});
+
+app.post('/admin/ai-artworks/:id/reject', isAdmin, (req, res) => {
+  db.run('UPDATE ai_artworks SET status = ? WHERE id = ?', ['rejected', req.params.id], () => {
+    res.redirect('/admin/ai-artworks');
+  });
+});
+
+app.post('/admin/ai-artworks/:id/delete', isAdmin, (req, res) => {
+  db.get('SELECT local_path FROM ai_artworks WHERE id = ?', [req.params.id], (err, row) => {
+    if (row && row.local_path) {
+      const fp = path.join(__dirname, 'public', row.local_path);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    }
+    db.run('DELETE FROM ai_artworks WHERE id = ?', [req.params.id], () => {
+      res.redirect('/admin/ai-artworks');
+    });
+  });
+});
+
+// 图片代理：隐藏原始 Pollinations URL
+app.get('/ai-image/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id || id < 1) return res.status(400).end();
+  db.get('SELECT image_url, local_path FROM ai_artworks WHERE id = ?', [id], (err, row) => {
+    if (err || !row) return res.status(404).end();
+    if (row.local_path) {
+      const fp = path.join(__dirname, 'public', row.local_path);
+      if (fs.existsSync(fp)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return fs.createReadStream(fp).pipe(res);
+      }
+    }
+    const url = row.image_url;
+    if (!url || !isSafeUrl(url)) return res.status(404).end();
+    const protocol = url.startsWith('https') ? require('https') : require('http');
+    protocol.get(url, (imgRes) => {
+      if (imgRes.statusCode !== 200) return res.status(502).end();
+      res.setHeader('Content-Type', imgRes.headers['content-type'] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      imgRes.pipe(res);
+    }).on('error', () => res.status(502).end());
+  });
+});
+
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   if (err.code === 'EBADCSRFTOKEN') return res.status(403).send('表单已过期，请刷新重试');
   console.error(err);
   res.status(500).send('服务器内部错误');
+});
+
+// 全局错误捕获 - 防止崩溃信息泄露到前端
+process.on('uncaughtException', (err) => {
+  console.error('未捕获异常:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('未处理Promise拒绝:', reason);
 });
 
 httpServer.listen(3000, () => {

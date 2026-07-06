@@ -114,6 +114,8 @@
       <a class="danger" href="/logout">退出</a>
       <a href="/redeem">兑换</a>
       <a href="/track">📦 查快递</a>
+      <a href="/prompt-generator">🤖 AI生图</a>
+      <a href="/prompt-generator/gallery">🖼️ 画廊</a>
     </div>
   </div>
 
@@ -138,10 +140,23 @@
         </div>
       </div>
     <% } %>
+    <% if (typeof announcements !== 'undefined' && announcements.length > 0) { %>
+    <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #f59e0b;border-radius:14px;padding:14px 20px;margin-bottom:18px;animation:pulse 2s infinite">
+      <style>@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.4)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0)}}</style>
+      <% announcements.forEach(function(a) { %>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:20px">📢</span>
+        <strong style="color:#92400e;font-size:14px"><%= a.title %></strong>
+      </div>
+      <p style="margin:0;color:#78350f;font-size:13px;line-height:1.5"><%= a.content %></p>
+      <% if (announcements.length > 1) { %><hr style="border-color:rgba(245,158,11,0.3);margin:10px 0"><% } %>
+      <% }); %>
+    </div>
+    <% } %>
     <div class="user-card">
       <div class="info">
         <h2>👋 你好，<%= user.username %>！</h2>
-        <p>欢迎来到安全练习商城，发现喜欢的商品尽情购买吧</p>
+        <p>欢迎来到安全练习商城，发现喜欢的商品尽情购买吧 🟢 <span id="online-count" style="font-weight:700;">--</span> 人在线 | 📊 今日访问 <span id="dau-count" style="font-weight:700;">--</span> 人</p>
         <% if (user.shopId) { %>
           <span class="shop-badge has">🏪 已绑定店铺：<strong><%= user.shopName || '我的店铺' %></strong></span>
         <% } else { %>
@@ -150,7 +165,7 @@
       </div>
       <div class="balance">
         <div class="label">可用余额</div>
-        <div class="amount">¥<%= user.balance %></div>
+        <div class="amount" id="balance-amount">¥<%= user.balance %></div>
       </div>
     </div>
 
@@ -186,7 +201,7 @@
                  <span style="font-size:14px;color:#9ca3af;text-decoration:line-through;margin-left:8px;">¥<%= f.original_price %></span>
                  <span style="background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:4px;font-size:12px;margin-left:6px;">-<%= Math.round((1 - f.flash_price / f.original_price) * 100) %>%</span>
                </div>
-                 <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">仅剩 <strong style="color:#ef4444;"><%= f.stock %></strong> 件</div>
+                 <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">仅剩 <strong style="color:#ef4444;" class="flash-stock" data-pid="<%= f.product_id %>"><%= f.stock %></strong> 件</div>
                  <form action="/buy" method="POST">
                  <input type="hidden" name="product_id" value="<%= f.product_id %>">
                              <input type="text" name="coupon" placeholder="优惠码（选填）" style="width:100%;padding:8px;border:2px solid #e5e7eb;border-radius:8px;font-size:13px;margin-bottom:8px;text-transform:uppercase;">
@@ -260,20 +275,7 @@
     <% } %>
 
     <% if (typeof shipments !== 'undefined' && shipments.length > 0) { %>
-    <div style="margin-top:24px">\server.js:341
-});
-^
-
-SyntaxError: Unexpected token '}'
-    at internalCompileFunction (node:internal/vm:73:18)
-    at wrapSafe (node:internal/modules/cjs/loader:1176:20)
-    at Module._compile (node:internal/modules/cjs/loader:1218:27)
-    at Module._extensions..js (node:internal/modules/cjs/loader:1308:10)
-    at Module.load (node:internal/modules/cjs/loader:1117:32)
-    at Module._load (node:internal/modules/cjs/loader:958:12)
-    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:81:12)
-    at node:internal/main/run_main_module:23:47
-
+    <div style="margin-top:24px">
       <h3 style="font-size:18px;margin-bottom:12px">📦 快递追踪</h3>
       <% shipments.forEach(function(s) { %>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6">
@@ -294,8 +296,28 @@ SyntaxError: Unexpected token '}'
     <% } %>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script>
   (function(){
+   var onlineEl = document.getElementById('online-count');
+   var dauEl = document.getElementById('dau-count');
+   var balanceEl = document.getElementById('balance-amount');
+   var socket = io();
+   socket.on('onlineCount', function(count) { onlineEl.textContent = count; });
+   socket.on('dauUpdate', function(count) { dauEl.textContent = count; });
+   socket.on('balanceUpdate', function(nb) { if (balanceEl) balanceEl.textContent = '¥' + nb; });
+   socket.on('flashStockUpdate', function(data) {
+     var el = document.querySelector('.flash-stock[data-pid="' + data.productId + '"]');
+     if (el) el.textContent = data.stock;
+   });
+   socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '商城首页' });
+   var xhr = new XMLHttpRequest();
+   xhr.open('GET', '/api/dau', true);
+   xhr.onload = function() {
+     try { var d = JSON.parse(xhr.responseText); dauEl.textContent = d.count; } catch(e) {}
+   };
+   xhr.send();
+
    document.querySelectorAll('.flash-timer').forEach(function(el){
     var end = new Date(el.dataset.end).getTime();
     var span = el.querySelector('.countdown');

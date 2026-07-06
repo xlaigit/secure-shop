@@ -105,6 +105,7 @@
     </div>
     <div class="return-form" id="returnForm">
       <form method="POST" action="/orders/<%= ship.order_id %>/return">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <textarea name="reason" placeholder="退货原因..."></textarea>
         <button class="btn btn-return">确认退货</button>
       </form>
@@ -115,6 +116,7 @@
     </div>
     <div class="return-form" id="returnForm">
       <form method="POST" action="/orders/<%= ship.order_id %>/return">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <textarea name="reason" placeholder="退货原因..."></textarea>
         <button class="btn btn-return">确认退货</button>
       </form>

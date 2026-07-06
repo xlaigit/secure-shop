@@ -1,0 +1,88 @@
+d:\肖宇帆\HTML项目\views\ai_gallery.ejs
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 作品画廊</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#fff;min-height:100vh}
+    .topbar{background:rgba(255,255,255,0.08);padding:14px 28px;backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:1px solid rgba(255,255,255,0.1)}
+    .topbar .brand{font-weight:700;font-size:18px;display:flex;align-items:center;gap:8px}
+    .topbar nav{display:flex;flex-wrap:wrap;gap:6px}
+    .topbar nav a{padding:8px 16px;text-decoration:none;color:#ccc;border-radius:10px;font-size:14px;font-weight:500;transition:all 0.2s}
+    .topbar nav a:hover{background:rgba(255,255,255,0.1);color:#fff}
+    .topbar nav a.active{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:white}
+    .container{max-width:1400px;margin:0 auto;padding:24px 28px}
+    .page-title{font-size:26px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+    .page-desc{color:#aaa;font-size:14px;margin-bottom:24px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+    .card{background:rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);transition:all 0.3s;display:flex;flex-direction:column}
+    .card:hover{transform:translateY(-4px);box-shadow:0 12px 30px rgba(0,0,0,0.4);border-color:rgba(255,255,255,0.2)}
+    .card .img-wrap{width:100%;height:220px;overflow:hidden;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center}
+    .card .img-wrap img{width:100%;height:100%;object-fit:cover}
+    .card .img-wrap .placeholder{color:#666;font-size:48px}
+    .card .info{padding:16px;flex:1;display:flex;flex-direction:column}
+    .card .summary{font-size:20px;font-weight:700;color:#69f0ae;margin-bottom:6px}
+    .card .author{font-size:13px;color:#aaa;margin-bottom:8px}
+    .card .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+    .card .tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(124,58,237,0.3);color:#c4b5fd}
+    .card .prompt{font-size:12px;color:#999;line-height:1.5;margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)}
+    .card .time{font-size:11px;color:#666;margin-top:8px}
+    .empty{padding:80px 28px;text-align:center}
+    .empty .ico{font-size:64px;margin-bottom:16px;opacity:0.4}
+    .empty h3{font-size:20px;font-weight:600;margin-bottom:8px}
+    .empty p{color:#888;font-size:14px}
+    .empty a{color:#7c3aed;text-decoration:none;font-weight:600}
+    @media (max-width:768px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><i class="fas fa-palette"></i> AI 作品画廊</div>
+    <nav>
+      <a href="/shop">🏠 商城</a>
+      <a href="/prompt-generator">🤖 AI生图</a>
+      <a class="active" href="/prompt-generator/gallery">🖼️ 画廊</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-title"><i class="fas fa-images"></i> AI 作品画廊</div>
+    <p class="page-desc">浏览社区成员生成的 AI 艺术作品</p>
+
+    <% if (artworks.length === 0) { %>
+    <div class="empty">
+      <div class="ico">🖼️</div>
+      <h3>暂无作品</h3>
+      <p>还没有审核通过的作品，快去 <a href="/prompt-generator">生成你的第一幅 AI 作品</a> 吧！</p>
+    </div>
+    <% } else { %>
+    <div class="grid">
+      <% artworks.forEach(function(art) { %>
+      <div class="card">
+        <div class="img-wrap">
+          <img src="/ai-image/<%= art.id %>" alt="<%= art.summary %>" loading="lazy" onerror="this.parentElement.innerHTML='<span class=placeholder>🖼️</span>'">
+        </div>
+        <div class="info">
+          <div class="summary"><%= art.summary || '未命名' %></div>
+          <div class="author">👤 <%= art.username %> · <%= art.created_at %></div>
+          <div class="tags">
+            <% if (art.prompt_genre) { %><span class="tag"><%= art.prompt_genre %></span><% } %>
+            <% if (art.prompt_style) { %><span class="tag"><%= art.prompt_style %></span><% } %>
+            <% if (art.prompt_adjective) { %><span class="tag"><%= art.prompt_adjective %></span><% } %>
+          </div>
+          <div class="prompt">
+            <% if (art.prompt_scene) { %>📝 <%= art.prompt_scene.substring(0, 80) %><% if (art.prompt_scene.length > 80) { %>...<% } %><% } %>
+          </div>
+          <div class="time"><%= art.created_at %></div>
+        </div>
+      </div>
+      <% }); %>
+    </div>
+    <% } %>
+  </div>
+</body>
+</html>

@@ -1,0 +1,708 @@
+d:\肖宇帆\HTML项目\views\prompt_generator.ejs
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 图像提示词生成器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a237e, #311b92, #4a148c);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .nav-bar {
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .nav-bar a {
+            color: #ffcc80;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .nav-bar a:hover {
+            color: #fff;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            background: linear-gradient(to right, #ff9a9e, #fad0c4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto 25px;
+            line-height: 1.6;
+        }
+        
+        .generator-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        
+        @media (max-width: 900px) {
+            .generator-container {
+                grid-template-columns: 1fr;
+            }
+            h1 {
+                font-size: 2.5rem;
+            }
+        }
+        
+        .input-section, .output-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        .input-section h2, .output-section h2 {
+            font-size: 2rem;
+            margin-bottom: 25px;
+            color: #ffcc80;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #4dd0e1;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4dd0e1;
+            box-shadow: 0 0 15px rgba(77, 208, 225, 0.5);
+        }
+        
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        .tip {
+            font-size: 0.9rem;
+            color: #ffcc80;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 15px 35px;
+            background: linear-gradient(to right, #00c853, #64dd17);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .output-content {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 200px;
+        }
+        
+        .summary {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-align: center;
+            color: #69f0ae;
+            text-shadow: 0 0 10px rgba(105, 240, 174, 0.7);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .url-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+            word-break: break-all;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .url-box a {
+            color: #4dd0e1;
+            word-break: break-all;
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .btn-publish {
+            background: linear-gradient(to right, #7c3aed, #5b21b6);
+        }
+        .btn-download {
+            background: linear-gradient(to right, #2563eb, #1d4ed8);
+        }
+        .btn-gallery {
+            background: linear-gradient(to right, #f59e0b, #d97706);
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            z-index: 999;
+            animation: fadeInOut 3s ease;
+            pointer-events: none;
+        }
+        .toast.success { background: #10b981; color: white; }
+        .toast.error { background: #ef4444; color: white; }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .image-preview {
+            width: 100%;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 30px;
+            overflow: hidden;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: cover;
+        }
+        
+        .output-content h3 {
+            color: #ffcc80;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin: 50px 0;
+        }
+        
+        .example-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .example-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .example-card h3 {
+            color: #ffcc80;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+        }
+        
+        .example-card p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .example-summary {
+            font-weight: bold;
+            color: #69f0ae;
+            margin-top: 15px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .stat-item .stat-icon { font-size: 1.3rem; }
+        .stat-item .stat-value { color: #69f0ae; margin-left: 4px; }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <a href="/shop">← 返回商城</a>
+    </div>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-magic"></i> AI 图像提示词生成器</h1>
+            <p class="subtitle">描述您想要的图像，我将为您创建专业的提示词并生成图像链接</p>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-icon">🟢</span> 实时在线：<span class="stat-value" id="online-count">--</span> 人
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📊</span> 今日访问：<span class="stat-value" id="dau-count">--</span> 人
+                </div>
+            </div>
+        </header>
+        
+        <div class="generator-container">
+            <div class="input-section">
+                <h2><i class="fas fa-edit"></i> 描述您的图像</h2>
+                
+                <div class="form-group">
+                    <label for="scene">场景描述（详细）</label>
+                    <textarea id="scene" placeholder="例如：未来城市中的霓虹街道，下雨的夜晚，高耸的摩天大楼..."></textarea>
+                    <p class="tip">详细描述图像的主要场景和环境</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="adjective">形容词（氛围）</label>
+                    <input type="text" id="adjective" placeholder="例如：赛博朋克、梦幻、超现实、史诗...">
+                    <p class="tip">描述图像的整体氛围和感觉</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="characters">角色/物体（详细）</label>
+                    <textarea id="characters" placeholder="例如：穿着皮夹克的女性黑客，全息投影的龙，漂浮的机器人..."></textarea>
+                    <p class="tip">描述图像中的主要角色或物体</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="style">视觉风格</label>
+                    <input type="text" id="style" placeholder="例如：概念艺术、油画、3D渲染、插画...">
+                    <p class="tip">指定您想要的视觉艺术风格</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="genre">类型/流派</label>
+                    <input type="text" id="genre" placeholder="例如：科幻、奇幻、蒸汽朋克、现实主义...">
+                    <p class="tip">图像的流派或类别</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="artist">艺术家参考</label>
+                    <input type="text" id="artist" placeholder="例如：宫崎骏、莫比斯、Greg Rutkowski...">
+                    <p class="tip">参考的艺术风格或艺术家</p>
+                </div>
+                
+                <button class="btn" id="generate-btn">
+                    <i class="fas fa-bolt"></i> 生成提示词
+                </button>
+            </div>
+            
+            <div class="output-section">
+                <h2><i class="fas fa-image"></i> 生成结果</h2>
+                
+                <div class="summary" id="summary-output">五字总结将显示在这里</div>
+                
+                <div class="output-content">
+                    <h3><i class="fas fa-link"></i> 图像生成 URL</h3>
+                    <div class="url-box" id="url-output">
+                        生成的URL将显示在这里
+                    </div>
+                    
+                    <h3><i class="fas fa-eye"></i> 图像预览</h3>
+                    <div class="image-preview" id="image-preview">
+                        <p>图像预览将显示在这里</p>
+                    </div>
+                    
+                    <div class="btn-row">
+                        <button class="btn btn-publish" id="publish-btn" style="flex:1;font-size:1rem;padding:12px 20px;">
+                            <i class="fas fa-cloud-upload-alt"></i> 发布到画廊
+                        </button>
+                        <button class="btn btn-download" id="download-btn" style="flex:1;font-size:1rem;padding:12px 20px;">
+                            <i class="fas fa-download"></i> 保存到本地
+                        </button>
+                        <a class="btn btn-gallery" href="/prompt-generator/gallery" style="flex:1;font-size:1rem;padding:12px 20px;text-decoration:none;">
+                            <i class="fas fa-images"></i> 查看画廊
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="examples">
+            <div class="example-card" data-scene="漂浮在天空中的魔法岛屿，瀑布从边缘流入云海" data-adjective="空灵、神秘" data-characters="骑着飞龙的精灵骑士" data-style="数字绘画" data-genre="奇幻" data-artist="Alan Lee">
+                <h3>示例 1: 奇幻风景</h3>
+                <p><strong>场景:</strong> 漂浮在天空中的魔法岛屿，瀑布从边缘流入云海</p>
+                <p><strong>形容词:</strong> 空灵、神秘</p>
+                <p><strong>角色:</strong> 骑着飞龙的精灵骑士</p>
+                <p><strong>风格:</strong> 数字绘画</p>
+                <p><strong>流派:</strong> 奇幻</p>
+                <p><strong>艺术家:</strong> Alan Lee</p>
+                <div class="example-summary">天空岛龙骑士</div>
+            </div>
+            
+            <div class="example-card" data-scene="未来都市的霓虹街道，全息广告牌，飞行汽车" data-adjective="赛博朋克、潮湿" data-characters="穿高科技装备的赏金猎人" data-style="3D渲染" data-genre="科幻" data-artist="Syd Mead">
+                <h3>示例 2: 科幻城市</h3>
+                <p><strong>场景:</strong> 未来都市的霓虹街道，全息广告牌，飞行汽车</p>
+                <p><strong>形容词:</strong> 赛博朋克、潮湿</p>
+                <p><strong>角色:</strong> 穿高科技装备的赏金猎人</p>
+                <p><strong>风格:</strong> 3D渲染</p>
+                <p><strong>流派:</strong> 科幻</p>
+                <p><strong>艺术家:</strong> Syd Mead</p>
+                <div class="example-summary">霓虹未来猎手</div>
+            </div>
+            
+            <div class="example-card" data-scene="古罗马斗兽场，日落时分，观众满座" data-adjective="史诗、壮观" data-characters="角斗士与猛虎对峙" data-style="油画" data-genre="历史" data-artist="卡拉瓦乔">
+                <h3>示例 3: 历史场景</h3>
+                <p><strong>场景:</strong> 古罗马斗兽场，日落时分，观众满座</p>
+                <p><strong>形容词:</strong> 史诗、壮观</p>
+                <p><strong>角色:</strong> 角斗士与猛虎对峙</p>
+                <p><strong>风格:</strong> 油画</p>
+                <p><strong>流派:</strong> 历史</p>
+                <p><strong>艺术家:</strong> 卡拉瓦乔</p>
+                <div class="example-summary">斗兽场日落战</div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>AI 图像提示词生成器 | 使用 Pollinations API 生成图像</p>
+            <p>提示词格式: {sceneDetailed} {adjective} {charactersDetailed} {visualStyle} {genre} {artistReference}</p>
+        </footer>
+    </div>
+
+    <div class="toast" id="toast" style="display:none;"></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        (function() {
+            var onlineCountEl = document.getElementById('online-count');
+            var dauCountEl = document.getElementById('dau-count');
+
+            var socket = io();
+            socket.on('onlineCount', function(count) {
+                onlineCountEl.textContent = count;
+            });
+            socket.on('dauUpdate', function(count) {
+                dauCountEl.textContent = count;
+            });
+
+            function fetchDAU() {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', '/api/dau', true);
+                xhr.onload = function() {
+                    try {
+                        var d = JSON.parse(xhr.responseText);
+                        dauCountEl.textContent = d.count;
+                    } catch(e) {}
+                };
+                xhr.send();
+            }
+            fetchDAU();
+            <% if (user) { %>
+            socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: 'AI 生图' });
+            <% } %>
+            var summaryOutput = document.getElementById('summary-output');
+            var urlOutput = document.getElementById('url-output');
+            var imagePreview = document.getElementById('image-preview');
+            var generateBtn = document.getElementById('generate-btn');
+            var publishBtn = document.getElementById('publish-btn');
+            var downloadBtn = document.getElementById('download-btn');
+            var toastEl = document.getElementById('toast');
+            var currentImageUrl = '';
+            var currentSummary = '';
+            var toastTimer = null;
+
+            function showToast(msg, isError) {
+                toastEl.textContent = msg;
+                toastEl.className = 'toast ' + (isError ? 'error' : 'success');
+                toastEl.style.display = 'block';
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(function() { toastEl.style.display = 'none'; }, 3000);
+            }
+
+            var words = [
+                "神秘", "史诗", "梦幻", "未来", "古典", 
+                "浪漫", "科幻", "奇幻", "蒸汽", "赛博",
+                "英雄", "巨龙", "骑士", "魔法", "科技"
+            ];
+            
+            function generateSummary() {
+                var result = '';
+                for (var i = 0; i < 3; i++) {
+                    result += words[Math.floor(Math.random() * words.length)];
+                }
+                return result;
+            }
+            
+            function generateImage() {
+                var scene = document.getElementById('scene').value || "奇幻风景";
+                var adjective = document.getElementById('adjective').value || "史诗";
+                var characters = document.getElementById('characters').value || "龙与骑士";
+                var style = document.getElementById('style').value || "概念艺术";
+                var genre = document.getElementById('genre').value || "奇幻";
+                var artist = document.getElementById('artist').value || "Greg Rutkowski";
+                
+                currentSummary = generateSummary();
+                summaryOutput.textContent = currentSummary;
+                
+                var fullPrompt = scene + ' ' + adjective + ' ' + characters + ' ' + style + ' ' + genre + ' ' + artist;
+                var seed = Math.floor(Math.random() * 100000);
+                currentImageUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(fullPrompt) + '?width=1024&height=1024&seed=' + seed + '&model=flux&nologo=true';
+                
+                urlOutput.innerHTML = '<span style="color:#4dd0e1;">图像已生成</span> <a href="' + currentImageUrl + '" target="_blank" style="color:#ffcc80;">[新标签页打开]</a>';
+                
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 加载中...';
+                imagePreview.innerHTML = '<p style="color:#ffcc80;">⏳ 正在加载图像，请稍候...</p>';
+                
+                var img = new Image();
+                img.alt = 'AI Generated Image';
+                var loadingTimer = null;
+                var loaded = false;
+                
+                function onFinish() {
+                    loaded = true;
+                    if (loadingTimer) clearTimeout(loadingTimer);
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = '<i class="fas fa-bolt"></i> 生成提示词';
+                }
+                
+                img.onload = function() {
+                    if (loaded) return;
+                    imagePreview.innerHTML = '';
+                    imagePreview.appendChild(img);
+                    onFinish();
+                };
+                img.onerror = function() {
+                    if (loaded) return;
+                    imagePreview.innerHTML = '<p style="color:#ffcc80;">⚠️ 图像加载失败，可能是请求太频繁，请稍等几秒后重新点击「生成提示词」</p>';
+                    onFinish();
+                };
+                
+                // 超过 15 秒还加载不出来就提示失败
+                loadingTimer = setTimeout(function() {
+                    if (loaded) return;
+                    onFinish();
+                    imagePreview.innerHTML = '<p style="color:#ffcc80;">⚠️ 图像加载超时（15秒），可能是AI服务繁忙，请稍后重试</p>';
+                }, 15000);
+                
+                img.src = currentImageUrl;
+            }
+
+            function publishArtwork() {
+                if (!currentImageUrl) { showToast('请先生成图像', true); return; }
+                publishBtn.disabled = true;
+                publishBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 发布中...';
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/prompt-generator/publish', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    publishBtn.disabled = false;
+                    publishBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> 发布到画廊';
+                    try { var d = JSON.parse(xhr.responseText); showToast(d.msg, !d.ok); }
+                    catch(e) { showToast('发布失败', true); }
+                };
+                xhr.onerror = function() {
+                    publishBtn.disabled = false;
+                    publishBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> 发布到画廊';
+                    showToast('网络错误', true);
+                };
+                var params = 'image_url=' + encodeURIComponent(currentImageUrl)
+                    + '&scene=' + encodeURIComponent(document.getElementById('scene').value)
+                    + '&adjective=' + encodeURIComponent(document.getElementById('adjective').value)
+                    + '&characters=' + encodeURIComponent(document.getElementById('characters').value)
+                    + '&style=' + encodeURIComponent(document.getElementById('style').value)
+                    + '&genre=' + encodeURIComponent(document.getElementById('genre').value)
+                    + '&artist=' + encodeURIComponent(document.getElementById('artist').value)
+                    + '&summary=' + encodeURIComponent(currentSummary);
+                xhr.send(params);
+            }
+
+            function downloadImage() {
+                if (!currentImageUrl) { showToast('请先生成图像', true); return; }
+                downloadBtn.disabled = true;
+                downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/prompt-generator/download', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '<i class="fas fa-download"></i> 保存到本地';
+                    try { var d = JSON.parse(xhr.responseText); showToast(d.msg, !d.ok); }
+                    catch(e) { showToast('保存失败', true); }
+                };
+                xhr.onerror = function() {
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '<i class="fas fa-download"></i> 保存到本地';
+                    showToast('网络错误', true);
+                };
+                xhr.send('image_url=' + encodeURIComponent(currentImageUrl));
+            }
+            
+            // 自动保存输入内容到本地存储，刷新不丢失
+            function saveInputsToStorage() {
+                var data = {
+                    scene: document.getElementById('scene').value,
+                    adjective: document.getElementById('adjective').value,
+                    characters: document.getElementById('characters').value,
+                    style: document.getElementById('style').value,
+                    genre: document.getElementById('genre').value,
+                    artist: document.getElementById('artist').value
+                };
+                localStorage.setItem('ai_generator_inputs', JSON.stringify(data));
+            }
+
+            // 从本地存储加载之前输入的内容
+            function loadInputsFromStorage() {
+                try {
+                    var saved = localStorage.getItem('ai_generator_inputs');
+                    if (saved) {
+                        var data = JSON.parse(saved);
+                        document.getElementById('scene').value = data.scene || '';
+                        document.getElementById('adjective').value = data.adjective || '';
+                        document.getElementById('characters').value = data.characters || '';
+                        document.getElementById('style').value = data.style || '';
+                        document.getElementById('genre').value = data.genre || '';
+                        document.getElementById('artist').value = data.artist || '';
+                    }
+                } catch(e) {}
+            }
+
+            // 监听输入变化，自动保存
+            ['scene', 'adjective', 'characters', 'style', 'genre', 'artist'].forEach(function(id) {
+                var el = document.getElementById(id);
+                el.addEventListener('input', saveInputsToStorage);
+            });
+
+            // 页面加载时自动恢复之前输入的内容
+            loadInputsFromStorage();
+
+            generateBtn.addEventListener('click', function() {
+                saveInputsToStorage();
+                generateImage();
+            });
+            publishBtn.addEventListener('click', publishArtwork);
+            downloadBtn.addEventListener('click', downloadImage);
+            
+            var exampleCards = document.querySelectorAll('.example-card');
+            for (var i = 0; i < exampleCards.length; i++) {
+                exampleCards[i].addEventListener('click', function() {
+                    document.getElementById('scene').value = this.getAttribute('data-scene') || '';
+                    document.getElementById('adjective').value = this.getAttribute('data-adjective') || '';
+                    document.getElementById('characters').value = this.getAttribute('data-characters') || '';
+                    document.getElementById('style').value = this.getAttribute('data-style') || '';
+                    document.getElementById('genre').value = this.getAttribute('data-genre') || '';
+                    document.getElementById('artist').value = this.getAttribute('data-artist') || '';
+                    saveInputsToStorage();
+                    generateImage();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+            
+        })();
+    </script>
+</body>
+</html>

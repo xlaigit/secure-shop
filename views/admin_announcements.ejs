@@ -1,0 +1,108 @@
+d:\肖宇帆\HTML项目\views\admin_announcements.ejs
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>公告管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white}
+    .container{max-width:900px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .form-row{display:flex;flex-direction:column;gap:10px}
+    .form-row label{font-size:12px;color:#6b7280;margin-bottom:2px;font-weight:500}
+    .form-row input,.form-row textarea{padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;resize:vertical}
+    .form-row textarea{min-height:80px}
+    .form-row input:focus,.form-row textarea:focus{border-color:#06b6d4}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white;box-shadow:0 4px 12px rgba(6,182,212,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(6,182,212,.4)}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    .btn-sm{padding:6px 12px;font-size:11px;border-radius:8px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px}
+    tr:hover td{background:#ecfeff}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-active{background:#ecfdf5;color:#065f46}
+    .badge-inactive{background:#fef2f2;color:#991b1b}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    @media(max-width:768px){.nav{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <span class="brand">📢 公告管理中心</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/announcements" class="active">📢 公告</a>
+      <a href="/admin/users">👥 用户</a>
+      <a href="/admin/products">📦 商品</a>
+      <a href="/admin/logout" style="color:#dc2626">退出</a>
+    </div>
+  </div>
+  <div class="container">
+    <h1>📢 公告管理</h1>
+    <div class="card">
+      <h2>➕ 新建公告</h2>
+      <form method="POST" action="/admin/announcements/create">
+        <div class="form-row">
+          <label>公告标题</label>
+          <input type="text" name="title" placeholder="例如：系统维护通知" required maxlength="100">
+          <label>公告内容</label>
+          <textarea name="content" placeholder="输入公告内容..." required maxlength="500"></textarea>
+          <button type="submit" class="btn btn-primary" style="align-self:flex-start;margin-top:4px">发布公告</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>📋 公告列表</h2>
+      <% if (announcements.length === 0) { %>
+        <div class="empty">暂无公告，上方创建第一条</div>
+      <% } else { %>
+      <table>
+        <thead><tr>
+          <th>标题</th>
+          <th>状态</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr></thead>
+        <tbody>
+        <% announcements.forEach(function(a) { %>
+          <tr>
+            <td style="font-weight:500"><%= a.title %></td>
+            <td>
+              <% if (a.is_active) { %>
+                <span class="badge badge-active">🟢 显示中</span>
+              <% } else { %>
+                <span class="badge badge-inactive">⚫ 已隐藏</span>
+              <% } %>
+            </td>
+            <td style="color:#6b7280"><%= a.created_at %></td>
+            <td style="display:flex;gap:6px">
+              <form method="POST" action="/admin/announcements/toggle/<%= a.id %>" style="margin:0">
+                <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:none">
+                  <%= a.is_active ? '隐藏' : '显示' %>
+                </button>
+              </form>
+              <form method="POST" action="/admin/announcements/delete/<%= a.id %>" style="margin:0" onsubmit="return confirm('确定删除此公告？')">
+                <button type="submit" class="btn btn-sm btn-danger">删除</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

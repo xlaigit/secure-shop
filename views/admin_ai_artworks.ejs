@@ -1,0 +1,158 @@
+d:\肖宇帆\HTML项目\views\admin_ai_artworks.ejs
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 作品审核 · 后台管理</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI','Inter',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
+    .topbar{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .topbar .left{display:flex;align-items:center;gap:12px}
+    .topbar .logo{width:38px;height:38px;background:linear-gradient(135deg,#7c3aed,#5b21b6);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .topbar .logo svg{width:20px;height:20px;color:white}
+    .topbar .title{font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .topbar .title small{display:block;font-size:12px;color:#6b7280;font-weight:500;margin-top:2px}
+    .topbar nav{display:flex;flex-wrap:wrap;gap:4px}
+    .topbar nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .topbar nav a:hover{background:#f3f4f6;color:#7c3aed}
+    .topbar nav a.active{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:white;box-shadow:0 4px 12px rgba(124,58,237,0.3)}
+    .topbar nav a.danger{color:#dc2626}
+    .topbar nav a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1400px;margin:0 auto;padding:24px 28px}
+    .page-title{font-size:22px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+    .page-desc{color:#6b7280;font-size:13.5px;margin-bottom:18px}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+    .stat{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border-left:4px solid #7c3aed;transition:transform 0.15s}
+    .stat:hover{transform:translateY(-2px)}
+    .stat .label{font-size:12px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+    .stat .num{font-size:30px;font-weight:700;color:#1f2937;margin-top:6px}
+    .stat.pending{border-left-color:#f59e0b}
+    .stat.pending .num{color:#92400e}
+    .stat.approved{border-left-color:#10b981}
+    .stat.approved .num{color:#065f46}
+    .stat.rejected{border-left-color:#ef4444}
+    .stat.rejected .num{color:#991b1b}
+    .list{background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .list-header{padding:14px 20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);font-weight:700;font-size:12.5px;color:#374151;display:grid;grid-template-columns:60px 180px 1fr 100px 200px;gap:12px;align-items:center;text-transform:uppercase;letter-spacing:0.3px}
+    .item{padding:16px 20px;border-top:1px solid #f3f4f6;display:grid;grid-template-columns:60px 180px 1fr 100px 200px;gap:12px;align-items:start;font-size:14px;transition:background 0.15s}
+    .item:hover{background:#fafafa}
+    .item .id{color:#9ca3af;font-family:monospace;font-size:13px;font-weight:600;padding-top:4px}
+    .item .thumb{width:160px;height:120px;border-radius:10px;overflow:hidden;background:#f3f4f6;display:flex;align-items:center;justify-content:center}
+    .item .thumb img{width:100%;height:100%;object-fit:cover}
+    .item .thumb .nopic{color:#ccc;font-size:32px}
+    .item .info{line-height:1.6}
+    .item .info .name{font-weight:700;color:#111827;font-size:15px;margin-bottom:2px}
+    .item .info .meta{font-size:12px;color:#6b7280}
+    .item .info .prompt{font-size:12px;color:#9ca3af;margin-top:4px;line-height:1.5}
+    .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase}
+    .badge.pending{background:#fef3c7;color:#92400e}
+    .badge.approved{background:#d1fae5;color:#065f46}
+    .badge.rejected{background:#fee2e2;color:#991b1b}
+    .actions{display:flex;flex-direction:column;gap:6px}
+    .actions form{display:inline}
+    .btn{padding:7px 12px;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;transition:all 0.15s;font-family:inherit;white-space:nowrap}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,0.15)}
+    .btn-approve{background:#10b981;color:white;width:100%}
+    .btn-approve:hover{background:#059669}
+    .btn-reject{background:#f59e0b;color:white;width:100%}
+    .btn-reject:hover{background:#d97706}
+    .btn-delete{background:#ef4444;color:white;width:100%}
+    .btn-delete:hover{background:#dc2626}
+    .empty{padding:60px 28px;text-align:center}
+    .empty .ico{font-size:48px;margin-bottom:12px;opacity:0.4}
+    .empty h3{font-size:18px;font-weight:700;margin-bottom:6px}
+    .empty p{color:#6b7280;font-size:13.5px}
+    @media (max-width:900px){.list-header,.item{grid-template-columns:1fr;gap:8px}.item .thumb{width:100%;height:200px}.stats{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="left">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <div class="title">AI 作品审核<small>Admin · AI Artworks Review</small></div>
+    </div>
+    <nav>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/reports">🚩 举报</a>
+      <a href="/admin/appeals">📢 申诉</a>
+      <a href="/admin/users">👥 用户</a>
+      <a class="active" href="/admin/ai-artworks">🎨 AI作品</a>
+      <a class="danger" href="/admin/logout">退出</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-title">🎨 AI 作品审核</div>
+    <p class="page-desc">审核用户发布的 AI 生成作品，通过后将在画廊中展示</p>
+
+    <%
+      var pendingCount = 0, approvedCount = 0, rejectedCount = 0;
+      artworks.forEach(function(a) {
+        if (a.status === 'pending') pendingCount++;
+        else if (a.status === 'approved') approvedCount++;
+        else if (a.status === 'rejected') rejectedCount++;
+      });
+    %>
+    <div class="stats">
+      <div class="stat pending"><div class="label">待审核</div><div class="num"><%= pendingCount %></div></div>
+      <div class="stat approved"><div class="label">已通过</div><div class="num"><%= approvedCount %></div></div>
+      <div class="stat rejected"><div class="label">已拒绝</div><div class="num"><%= rejectedCount %></div></div>
+    </div>
+
+    <% if (artworks.length === 0) { %>
+    <div class="empty">
+      <div class="ico">🎨</div>
+      <h3>暂无 AI 作品</h3>
+      <p>当用户发布 AI 作品后，将在此处显示</p>
+    </div>
+    <% } else { %>
+    <div class="list">
+      <div class="list-header">
+        <span>ID</span><span>预览</span><span>作品信息</span><span>状态</span><span>操作</span>
+      </div>
+      <% artworks.forEach(function(art) { %>
+      <div class="item">
+        <div class="id">#<%= art.id %></div>
+        <div class="thumb">
+          <img src="/ai-image/<%= art.id %>" alt="预览" loading="lazy" onerror="this.parentElement.innerHTML='<span class=nopic>🖼️</span>'">
+        </div>
+        <div class="info">
+          <div class="name"><%= art.summary || '未命名作品' %></div>
+          <div class="meta">👤 <%= art.username %> · 🕐 <%= art.created_at %></div>
+          <div class="prompt">
+            <% if (art.prompt_scene) { %>场景: <%= art.prompt_scene.substring(0, 60) %><% if (art.prompt_scene.length > 60) { %>...<% } %><br><% } %>
+            <% if (art.prompt_style) { %>风格: <%= art.prompt_style %> · <% } %>
+            <% if (art.prompt_genre) { %>流派: <%= art.prompt_genre %> · <% } %>
+            <% if (art.prompt_artist) { %>参考: <%= art.prompt_artist %><% } %>
+          </div>
+        </div>
+        <div>
+          <% if (art.status === 'pending') { %><span class="badge pending">⏳ 待审核</span>
+          <% } else if (art.status === 'approved') { %><span class="badge approved">✅ 已通过</span>
+          <% } else { %><span class="badge rejected">❌ 已拒绝</span><% } %>
+        </div>
+        <div class="actions">
+          <% if (art.status === 'pending') { %>
+          <form method="POST" action="/admin/ai-artworks/<%= art.id %>/approve">
+            <button class="btn btn-approve">✅ 通过</button>
+          </form>
+          <form method="POST" action="/admin/ai-artworks/<%= art.id %>/reject">
+            <button class="btn btn-reject">❌ 拒绝</button>
+          </form>
+          <% } %>
+          <form method="POST" action="/admin/ai-artworks/<%= art.id %>/delete" onsubmit="return confirm('确定删除该作品？此操作不可撤销。')">
+            <button class="btn btn-delete">🗑️ 删除</button>
+          </form>
+        </div>
+      </div>
+      <% }); %>
+    </div>
+    <% } %>
+  </div>
+</body>
+</html>

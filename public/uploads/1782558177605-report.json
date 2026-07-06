@@ -1,0 +1,44 @@
+{
+  "ports": [
+    {
+      "port": 3389,
+      "service": "RDP"
+    },
+    {
+      "port": 8080,
+      "service": "HTTP-Alt"
+    }
+  ],
+  "cms": [],
+  "dirs": [
+    {
+      "path": "/login",
+      "code": 200
+    },
+    {
+      "path": "/wp-admin",
+      "code": 403
+    },
+    {
+      "path": "/phpmyadmin",
+      "code": 403
+    },
+    {
+      "path": "/.git",
+      "code": 403
+    },
+    {
+      "path": "/.env",
+      "code": 403
+    },
+    {
+      "path": "/backup",
+      "code": 403
+    },
+    {
+      "path": "/console",
+      "code": 403
+    }
+  ],
+  "sensitive": []
+}

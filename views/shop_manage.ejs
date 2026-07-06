@@ -20,10 +20,31 @@
   ul{list-style:none;padding:0}
   li{background:#f7fafc;padding:12px 15px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
   .shop-desc{color:#718096;font-size:14px;margin:10px 0 20px}
+  .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center}
+  .modal-content{background:white;border-radius:16px;padding:24px;width:90%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+  .modal-title{font-size:18px;font-weight:700;color:#2d3748}
+  .modal-close{background:none;border:none;font-size:24px;cursor:pointer;color:#a0aec0;padding:0;margin:0}
+  .modal-close:hover{color:#4a5568}
+  .form-group{margin-bottom:16px}
+  .form-group label{display:block;margin-bottom:6px;font-size:14px;font-weight:600;color:#4a5568}
+  .form-group select,.form-group input{width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px;background:white}
+  .form-group select:focus,.form-group input:focus{outline:none;border-color:#4299e1}
+  .btn{display:inline-block;padding:10px 20px;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600}
+  .btn-primary{background:#4299e1;color:white;width:100%}
+  .btn-primary:hover{background:#3182ce}
+  .ship-info{background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:12px;margin-top:8px;font-size:13px;color:#2b6cb0;line-height:1.8}
+  .product-images{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .product-images img{width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0}
+  .product-images .img-wrap{position:relative;display:inline-block}
+  .product-images .del-img{position:absolute;top:-6px;right:-6px;background:#fc8181;color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;padding:0}
+  .upload-form{display:inline-block;margin-left:8px}
+  .upload-form input[type=file]{font-size:12px;width:160px}
+  .upload-form button{padding:4px 10px;font-size:12px;margin-top:0}
 </style></head>
 <body>
   <div class="nav">
-    <a href="/shop">🛒 商城</a> | <a href="/friends">👥 好友</a> | <a href="/chat">💬 群聊</a> | <a href="/shop/create">🏪 开店</a> | <a href="/shop/manage">📦 我的店铺</a> | <a href="/notifications">📨 邮件</a> | <a href="/appeal">📝 申诉</a>| <a href="/shop/coupons">🎫 优惠券</a> | <a href="/shop/warehouses">🏭 仓库</a>
+    <a href="/shop">🛒 商城</a> | <a href="/friends">👥 好友</a> | <a href="/chat">💬 群聊</a> | <a href="/shop/create">🏪 开店</a> | <a href="/shop/manage">📦 我的店铺</a> | <a href="/shop/warehouses">🏭 仓库</a> | <a href="/notifications">📨 邮件</a> | <a href="/appeal">📝 申诉</a>| <a href="/shop/coupons">🎫 优惠券</a> |
   </div>
 
   <% if (typeof shopWarning !== 'undefined' && shopWarning) { %>
@@ -47,18 +68,41 @@
       <label>名称：<input name="name" required></label><br>
       <label>价格：<input type="number" step="0.01" name="price" required></label><br>
       <label>库存：<input type="number" name="stock" value="999"></label><br>
+      <label>运费：<select name="shipping_policy" style="padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;width:200px">
+        <option value="0">📦 包邮（商家承担）</option>
+        <option value="1" selected>💰 不包邮（买家承担）</option>
+        <option value="2">🔄 半包邮（各付一半）</option>
+      </select></label><br>
       <button type="submit">✅ 添加</button>
     </form>
     <% } %>
     <h3>📦 商品列表</h3>
     <ul>
       <% products.forEach(p => { %>
-        <li>
+        <li style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
           <span><strong><%= p.name %></strong> - ¥<%= p.price %> (库存:<%= p.stock %>)</span>
           <form method="POST" action="/shop/product/delete/<%= p.id %>" style="display:inline">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" style="background:#fc8181">🗑️ 删除</button>
           </form>
+          </div>
+          <div class="product-images">
+            <% if (typeof images !== 'undefined') { images.filter(function(img){ return img.product_id === p.id; }).forEach(function(img){ %>
+              <div class="img-wrap">
+                <img src="<%= img.url %>" alt="商品图">
+                <form method="POST" action="/shop/product/<%= p.id %>/images/delete/<%= img.id %>" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="del-img" title="删除图片">✕</button>
+                </form>
+              </div>
+            <% }) } %>
+            <form method="POST" action="/shop/product/<%= p.id %>/images" enctype="multipart/form-data" class="upload-form">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="file" name="images" accept="image/*" multiple>
+              <button type="submit">📷 上传</button>
+            </form>
+          </div>
         </li>
       <% }) %>
       <% if (products.length === 0) { %><li style="justify-content:center;color:#a0aec0">📭 暂无商品，快来添加吧！</li><% } %>
@@ -75,7 +119,7 @@
             <% } else { %>⏳ 待发货<% } %>
           </span>
           <% if (!o.ship_status || o.ship_status === 'pending') { %>
-            <button class="btn" onclick="showShipForm('<%= o.id %>')" style="background:#e0e7ff;color:#4338ca">📦 发货</button>
+            <button type="button" class="btn ship-btn" data-order="<%= o.id %>" style="background:#e0e7ff;color:#4338ca">📦 发货</button>
           <% } %>
         </li>
       <% }) %>
@@ -95,12 +139,13 @@
   <div class="modal-content">
     <div class="modal-header">
       <span class="modal-title">📦 发货</span>
-      <button class="modal-close" onclick="document.getElementById('shipModal').style.display='none'">&times;</button>
+      <button class="modal-close" onclick="closeShipModal()">&times;</button>
     </div>
-    <form method="POST" id="shipForm">
+    <form method="POST" id="shipForm" action="#">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="form-group">
         <label>仓库</label>
-        <select name="warehouse_id" style="width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px">
+        <select name="warehouse_id">
           <option value="0">默认</option>
           <% if (typeof warehouses !== 'undefined') { warehouses.forEach(function(w) { %>
             <option value="<%= w.id %>"><%= w.name %></option>
@@ -109,24 +154,58 @@
       </div>
       <div class="form-group">
         <label>快递商</label>
-        <select name="carrier" style="width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px">
+        <select name="carrier" id="carrierSelect" onchange="updateShipInfo()">
           <option value="邮政">邮政（慢，3-7天）</option>
           <option value="中通">中通（中速，2-5天）</option>
           <option value="顺丰陆运">顺丰陆运（较快，2-3天）</option>
           <option value="顺丰空运">顺丰空运（快，1-2天）</option>
         </select>
+        <div class="ship-info" id="shipInfo">
+          📮 快递：<strong>邮政</strong> ｜ 速度：<strong>标准</strong> ｜ 时速：<strong>30km/h</strong> ｜ 运费：<strong>基础价</strong>
+        </div>
       </div>
       <div class="form-group">
         <label>重量 (kg)</label>
         <input name="weight" type="number" step="0.1" placeholder="0.5" value="1">
       </div>
-      <button class="btn btn-primary" style="width:100%">确认发货</button>
+      <button class="btn btn-primary" type="submit">确认发货</button>
+    </form>
   </div>
 </div>
 <script>
-function showShipForm(orderId) {
-  document.getElementById('shipForm').action = '/shop/ship/' + orderId;
-  document.getElementById('shipModal').style.display = 'block';
+(function(){
+var shipInfoData = {
+  '邮政': { speed: '标准', kmh: '30km/h', fee: '最低' },
+  '中通': { speed: '标准', kmh: '50km/h', fee: '中等' },
+  '顺丰陆运': { speed: '快速', kmh: '70km/h', fee: '较高' },
+  '顺丰空运': { speed: '特快', kmh: '500km/h', fee: '最高' }
+};
+function updateShipInfo() {
+  var c = document.getElementById('carrierSelect');
+  if (!c) return;
+  var d = shipInfoData[c.value] || { speed: '标准', kmh: '?', fee: '?' };
+  var el = document.getElementById('shipInfo');
+  if (el) el.innerHTML = '📮 快递：<strong>' + c.value + '</strong> ｜ 速度：<strong>' + d.speed + '</strong> ｜ 时速：<strong>' + d.kmh + '</strong> ｜ 运费：<strong>' + d.fee + '</strong>';
 }
+function showShipForm(orderId) {
+  var form = document.getElementById('shipForm');
+  var modal = document.getElementById('shipModal');
+  if (form) form.action = '/shop/ship/' + orderId;
+  if (modal) modal.style.display = 'flex';
+  updateShipInfo();
+}
+function closeShipModal() {
+  var modal = document.getElementById('shipModal');
+  if (modal) modal.style.display = 'none';
+}
+var btns = document.querySelectorAll('.ship-btn');
+for (var i = 0; i < btns.length; i++) {
+  btns[i].addEventListener('click', function(){
+    showShipForm(this.getAttribute('data-order'));
+  });
+}
+var cs = document.getElementById('carrierSelect');
+if (cs) cs.addEventListener('change', updateShipInfo);
+})();
 </script>
 </body></html>

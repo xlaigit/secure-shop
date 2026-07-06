@@ -24,7 +24,7 @@
     .welcome{margin-bottom:24px}
     .welcome h1{font-size:26px;font-weight:700;letter-spacing:-0.5px}
     .welcome p{color:#6b7280;font-size:14px;margin-top:6px}
-    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
     .stat{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border-left:4px solid #667eea;text-decoration:none;color:inherit;display:block}
     .stat:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,0.08)}
     .stat .label{font-size:12.5px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
@@ -88,6 +88,10 @@
        <span class="icon">🎫</span>
        <span class="text">优惠券管理</span>
       </a>
+      <a href="/admin/announcements" class="menu-item">
+       <span class="icon">📢</span>
+       <span class="text">公告管理</span>
+      </a>
       <a href="/admin/reports" class="menu-item">
         <span class="icon">🚩</span>
         <span class="text">举报管理</span>
@@ -95,6 +99,10 @@
       <a href="/admin/appeals" class="menu-item">
         <span class="icon">📢</span>
         <span class="text">申诉管理</span>
+      </a>
+      <a href="/admin/ai-artworks" class="menu-item">
+        <span class="icon">🎨</span>
+        <span class="text">AI作品</span>
       </a>
       <a href="/admin/users" class="menu-item">
         <span class="icon">👥</span>
@@ -150,6 +158,36 @@
         <div class="label">待处理申诉</div>
         <div class="num"><%= pendingAppeals %></div>
       </a>
+      <div class="stat" style="border-left-color:#10b981;background:linear-gradient(135deg,#fff 0%,#ecfdf5 100%)">
+        <span class="ico">🟢</span>
+        <div class="label">当前在线</div>
+        <div class="num" id="admin-online-count">--</div>
+      </div>
+      <div class="stat" style="border-left-color:#06b6d4;background:linear-gradient(135deg,#fff 0%,#ecfeff 100%)">
+        <span class="ico">👁</span>
+        <div class="label">今日 UV</div>
+        <div class="num"><%= todayUV %></div>
+      </div>
+      <div class="stat" style="border-left-color:#8b5cf6;background:linear-gradient(135deg,#fff 0%,#f5f3ff 100%)">
+        <span class="ico">📈</span>
+        <div class="label">今日 PV</div>
+        <div class="num"><%= todayPV %></div>
+      </div>
+    </div>
+
+    <div class="section-title">📊 最近 7 天趋势</div>
+    <div class="notice" style="margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+          <th style="padding:10px 12px;text-align:left;color:#6b7280;font-weight:600">日期</th>
+          <th style="padding:10px 12px;text-align:center;color:#6b7280;font-weight:600">UV（独立访客）</th>
+          <th style="padding:10px 12px;text-align:center;color:#6b7280;font-weight:600">PV（页面浏览）</th>
+          <th style="padding:10px 12px;text-align:center;color:#6b7280;font-weight:600">趋势</th>
+        </tr></thead>
+        <tbody id="trend-table">
+          <tr><td colspan="4" style="padding:16px;text-align:center;color:#9ca3af">加载中...</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="section-title">功能快捷入口</div>
@@ -220,7 +258,27 @@
         <p>创建和管理平台优惠券</p>
         <span class="tag">进入优惠券管理 →</span>
       </a>
+      <a href="/admin/ai-artworks" class="card" style="background:linear-gradient(135deg,#fff 0%,#faf5ff 100%)">
+        <div class="ico" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)">🎨</div>
+        <h3>AI 作品审核</h3>
+        <p>审核用户发布的 AI 生成作品</p>
+        <span class="tag">进入作品审核 →</span>
+      </a>
     </div>
+    <div class="section-title">🟢 在线用户</div>
+    <div class="notice" style="margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
+          <th style="padding:10px 12px;text-align:left;color:#6b7280;font-weight:600">用户</th>
+          <th style="padding:10px 12px;text-align:left;color:#6b7280;font-weight:600">所在页面</th>
+          <th style="padding:10px 12px;text-align:left;color:#6b7280;font-weight:600">IP 地址</th>
+        </tr></thead>
+        <tbody id="admin-online-list">
+          <tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="section-title">使用提示</div>
     <div class="notice">
       <h3>📌 管理员日常操作建议</h3>
@@ -233,5 +291,54 @@
       </ul>
     </div>
   </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function(){
+    var countEl = document.getElementById('admin-online-count');
+    var listEl = document.getElementById('admin-online-list');
+    var trendEl = document.getElementById('trend-table');
+    var socket = io();
+    socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '管理后台' });
+    socket.on('onlineCount', function(c) { countEl.textContent = c; });
+    socket.on('onlineUsers', function(users) {
+      var h = '';
+      if (users.length === 0) {
+        h = '<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af">暂无在线用户</td></tr>';
+      } else {
+        users.forEach(function(u) {
+          h += '<tr style="border-bottom:1px solid #f3f4f6">' +
+            '<td style="padding:10px 12px;font-weight:500">' + (u.username || '访客') + (u.id ? '' : ' <span style="color:#9ca3af;font-size:11px">(未登录)</span>') + '</td>' +
+            '<td style="padding:10px 12px;color:#6b7280">' + (u.page || '未知') + '</td>' +
+            '<td style="padding:10px 12px;color:#9ca3af;font-family:monospace">' + (u.ip || '未知') + '</td>' +
+            '</tr>';
+        });
+      }
+      listEl.innerHTML = h;
+    });
+    function loadTrend() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/visit-trend', true);
+      xhr.onload = function() {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var h = '';
+          data.forEach(function(d) {
+            var pct = d.uv > 0 ? Math.round(d.pv / d.uv * 10) / 10 : 0;
+            var barW = Math.min(100, Math.round(d.uv * 3));
+            h += '<tr style="border-bottom:1px solid #f3f4f6">' +
+              '<td style="padding:10px 12px;font-weight:500">' + d.date + '</td>' +
+              '<td style="padding:10px 12px;text-align:center;font-weight:600;color:#06b6d4">' + d.uv + '</td>' +
+              '<td style="padding:10px 12px;text-align:center;font-weight:600;color:#8b5cf6">' + d.pv + '</td>' +
+              '<td style="padding:10px 12px;text-align:center"><div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;display:inline-block;width:100%;max-width:120px"><div style="height:100%;width:' + barW + '%;background:linear-gradient(90deg,#06b6d4,#8b5cf6);border-radius:3px;min-width:4px"></div></div></td>' +
+              '</tr>';
+          });
+          trendEl.innerHTML = h;
+        } catch(e) {}
+      };
+      xhr.send();
+    }
+    loadTrend();
+  })();
+  </script>
 </body>
 </html>

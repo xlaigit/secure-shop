@@ -1,69 +1,174 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>个人资料</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人资料 - <%= user.username %></title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Microsoft YaHei','Segoe UI',sans-serif;background:linear-gradient(135deg,#f0f4ff 0%,#e8ecf5 100%);min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:12px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+    .nav a{color:#4b5563;text-decoration:none;font-size:14px;padding:6px 12px;border-radius:8px;transition:all 0.15s}
+    .nav a:hover{background:#f3f4f6;color:#6366f1}
+    .nav .user-info{color:#6366f1;font-weight:600;margin-left:auto}
+    .container{max-width:680px;margin:0 auto;padding:24px 20px}
+    .card{background:white;border-radius:20px;padding:32px;box-shadow:0 8px 30px rgba(0,0,0,0.06);margin-bottom:20px}
+    .card h2{font-size:20px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .avatar-section{display:flex;align-items:center;gap:24px;margin-bottom:24px;flex-wrap:wrap}
+    .avatar-preview{width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;background:#f3f4f6}
+    .avatar-placeholder{width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7);display:flex;align-items:center;justify-content:center;font-size:40px;color:white;font-weight:700}
+    .upload-box{border:2px dashed #d1d5db;border-radius:14px;padding:24px;text-align:center;cursor:pointer;transition:all 0.2s;flex:1;min-width:200px}
+    .upload-box:hover{border-color:#6366f1;background:#f8faff}
+    .upload-box input{display:none}
+    .upload-box .icon{font-size:32px;margin-bottom:8px}
+    .upload-box p{color:#6b7280;font-size:13px}
+    .upload-box .hint{color:#9ca3af;font-size:12px;margin-top:4px}
+    .btn{display:inline-block;padding:10px 22px;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;width:100%}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,0.3)}
+    .btn-outline{background:white;color:#6366f1;border:2px solid #6366f1;width:100%}
+    .btn-outline:hover{background:#f8faff}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-weight:600;font-size:14px;color:#374151;margin-bottom:6px}
+    .form-group input{width:100%;padding:10px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;transition:border-color 0.2s}
+    .form-group input:focus{outline:none;border-color:#6366f1}
+    .msg{text-align:center;padding:12px;border-radius:10px;margin-bottom:16px;font-size:14px}
+    .msg-success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+    .msg-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .url-upload{display:none;margin-top:12px}
+    .url-upload.show{display:block}
+    .toggle-link{color:#6366f1;cursor:pointer;font-size:13px;text-decoration:underline}
+    .info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px}
+    .info-row .label{color:#6b7280}
+    .info-row .value{font-weight:600;color:#1f2937}
+    @media (max-width:500px){.avatar-section{flex-direction:column;align-items:center}}
+  </style>
 </head>
 <body>
-  <div style="margin-bottom:10px">
-    欢迎，<%= user.username %> | 余额：<%= user.balance %> 元
-    | <a href="/shop">商城</a> | <a href="/orders">订单</a> | <a href="/friends">好友</a> | <a href="/chat">群聊</a> | <a href="/shop/create">开店</a> | <a href="/profile">头像</a> | <a href="/logout">注销</a>
+  <div class="nav">
+    <a href="/shop">🛒 商城</a>
+    <a href="/orders">📦 订单</a>
+    <a href="/friends">👥 好友</a>
+    <a href="/chat">💬 群聊</a>
+    <a href="/profile">👤 资料</a>
+    <a href="/logout">🚪 退出</a>
+    <span class="user-info">💰 ¥<%= user.balance %></span>
   </div>
-  <hr>
-  <h2>上传头像</h2>
-  <% if (msg) { %><p style="color:green"><%= msg %></p><% } %>
 
-  <h3>方式1：本地上传</h3>
-  <form action="/upload" method="POST" enctype="multipart/form-data">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <input type="file" name="avatar" required>
-    <button type="submit">上传</button>
-  </form>
+  <div class="container">
+    <% if (typeof msg !== 'undefined' && msg) { %>
+      <div class="msg <%= msg.includes('失败') ? 'msg-error' : 'msg-success' %>"><%= msg %></div>
+    <% } %>
 
-  <h3>方式2：通过URL上传（测SSRF）</h3>
-  <form action="/upload-url" method="POST">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <input type="text" name="imageUrl" placeholder="输入图片URL" style="width:300px" required>
-    <button type="submit">通过URL上传</button>
-  </form>
+    <div class="card">
+      <h2>🖼️ 头像设置</h2>
+      <div class="avatar-section">
+        <% if (typeof avatar !== 'undefined' && avatar && avatar.length > 0) { %>
+          <img class="avatar-preview" src="<%= avatar %>" alt="头像" id="avatarPreview">
+        <% } else { %>
+          <div class="avatar-placeholder"><%= user.username.charAt(0).toUpperCase() %></div>
+        <% } %>
+        <label class="upload-box" id="uploadBox">
+          <div class="icon">📁</div>
+          <p>点击选择头像图片</p>
+          <p class="hint">支持 JPG/PNG/GIF/WebP，最大 10MB</p>
+          <input type="file" id="avatarFile" accept="image/*" onchange="previewAvatar(this)">
+        </label>
+      </div>
+      <form method="POST" action="/upload" enctype="multipart/form-data" id="uploadForm">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="avatar_file" id="hiddenFile" value="">
+        <button type="submit" class="btn btn-primary">📤 上传头像</button>
+      </form>
+      <p style="text-align:center;margin-top:12px">
+        <span class="toggle-link" onclick="toggleUrlUpload()">🔗 或通过 URL 上传 →</span>
+      </p>
+      <div class="url-upload" id="urlUpload">
+        <form method="POST" action="/upload-url">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="form-group">
+            <input type="text" name="imageUrl" placeholder="输入图片URL，如 https://example.com/avatar.jpg" required>
+          </div>
+          <button type="submit" class="btn btn-outline">通过URL上传</button>
+        </form>
+      </div>
+    </div>
 
-  <h3>📍 收货地址</h3>
-  <form method="POST" action="/profile/address">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <input name="city" list="cityList" placeholder="输入城市名，如：杭州" value="<%= city || '' %>" style="width:300px;padding:8px;border:1px solid #ccc;border-radius:4px" autocomplete="off">
-    <button type="submit">保存地址</button>
-  </form>
-  <% if (typeof city !== 'undefined' && city) { %><p style="color:#10b981">✅ 当前：<%= city %></p><% } %>
+    <div class="card">
+      <h2>📍 收货地址</h2>
+      <form method="POST" action="/profile/address">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group">
+          <label>城市</label>
+          <input name="city" list="cityList" placeholder="输入城市名，如：杭州" value="<%= typeof city !== 'undefined' ? city : '' %>" autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary">💾 保存地址</button>
+      </form>
+      <% if (typeof city !== 'undefined' && city) { %>
+        <p style="margin-top:12px;color:#10b981;font-size:14px">✅ 当前地址：<strong><%= city %></strong></p>
+      <% } %>
+    </div>
 
-<datalist id="cityList">
-<option value="北京"><option value="天津"><option value="上海"><option value="重庆">
-<option value="石家庄"><option value="唐山"><option value="秦皇岛"><option value="邯郸"><option value="保定"><option value="张家口"><option value="承德"><option value="沧州"><option value="廊坊"><option value="衡水">
-<option value="太原"><option value="大同"><option value="阳泉"><option value="长治"><option value="晋城"><option value="临汾"><option value="运城">
-<option value="呼和浩特"><option value="包头"><option value="赤峰"><option value="通辽"><option value="鄂尔多斯">
-<option value="沈阳"><option value="大连"><option value="鞍山"><option value="抚顺"><option value="本溪"><option value="丹东"><option value="锦州"><option value="营口">
-<option value="长春"><option value="吉林"><option value="四平"><option value="通化">
-<option value="哈尔滨"><option value="齐齐哈尔"><option value="大庆">
+    <div class="card">
+      <h2>📋 账号信息</h2>
+      <div class="info-row"><span class="label">用户名</span><span class="value"><%= user.username %></span></div>
+      <div class="info-row"><span class="label">余额</span><span class="value">¥<%= user.balance %></span></div>
+      <div class="info-row"><span class="label">信誉分</span><span class="value"><%= user.reputation || 100 %></span></div>
+    </div>
+  </div>
+
+  <datalist id="cityList">
+<option value="北京市"><option value="天津市"><option value="上海市"><option value="重庆市">
+<option value="石家庄"><option value="唐山"><option value="秦皇岛"><option value="邯郸"><option value="邢台"><option value="保定"><option value="张家口"><option value="承德"><option value="沧州"><option value="廊坊"><option value="衡水">
+<option value="太原"><option value="大同"><option value="阳泉"><option value="长治"><option value="晋城"><option value="朔州"><option value="晋中"><option value="运城"><option value="忻州"><option value="临汾"><option value="吕梁">
+<option value="呼和浩特"><option value="包头"><option value="乌海"><option value="赤峰"><option value="通辽"><option value="鄂尔多斯"><option value="呼伦贝尔"><option value="巴彦淖尔"><option value="乌兰察布">
+<option value="沈阳"><option value="大连"><option value="鞍山"><option value="抚顺"><option value="本溪"><option value="丹东"><option value="锦州"><option value="营口"><option value="阜新"><option value="辽阳"><option value="盘锦"><option value="铁岭"><option value="朝阳"><option value="葫芦岛">
+<option value="长春"><option value="吉林"><option value="四平"><option value="辽源"><option value="通化"><option value="白山"><option value="松原"><option value="白城"><option value="延边">
+<option value="哈尔滨"><option value="齐齐哈尔"><option value="鸡西"><option value="鹤岗"><option value="双鸭山"><option value="大庆"><option value="伊春"><option value="佳木斯"><option value="七台河"><option value="牡丹江"><option value="黑河"><option value="绥化">
 <option value="南京"><option value="无锡"><option value="徐州"><option value="常州"><option value="苏州"><option value="南通"><option value="连云港"><option value="淮安"><option value="盐城"><option value="扬州"><option value="镇江"><option value="泰州"><option value="宿迁">
 <option value="杭州"><option value="宁波"><option value="温州"><option value="嘉兴"><option value="湖州"><option value="绍兴"><option value="金华"><option value="衢州"><option value="舟山"><option value="台州"><option value="丽水">
 <option value="合肥"><option value="芜湖"><option value="蚌埠"><option value="淮南"><option value="马鞍山"><option value="淮北"><option value="铜陵"><option value="安庆"><option value="黄山"><option value="滁州"><option value="阜阳"><option value="宿州"><option value="六安"><option value="亳州"><option value="池州"><option value="宣城">
-<option value="福州"><option value="厦门"><option value="莆田"><option value="泉州"><option value="漳州"><option value="龙岩"><option value="宁德">
-<option value="南昌"><option value="景德镇"><option value="萍乡"><option value="九江"><option value="新余"><option value="赣州"><option value="吉安"><option value="宜春"><option value="上饶">
+<option value="福州"><option value="厦门"><option value="莆田"><option value="三明"><option value="泉州"><option value="漳州"><option value="南平"><option value="龙岩"><option value="宁德">
+<option value="南昌"><option value="景德镇"><option value="萍乡"><option value="九江"><option value="新余"><option value="鹰潭"><option value="赣州"><option value="吉安"><option value="宜春"><option value="抚州"><option value="上饶">
 <option value="济南"><option value="青岛"><option value="淄博"><option value="枣庄"><option value="东营"><option value="烟台"><option value="潍坊"><option value="济宁"><option value="泰安"><option value="威海"><option value="日照"><option value="临沂"><option value="德州"><option value="聊城"><option value="滨州"><option value="菏泽">
-<option value="郑州"><option value="开封"><option value="洛阳"><option value="平顶山"><option value="安阳"><option value="新乡"><option value="焦作"><option value="许昌"><option value="漯河"><option value="南阳"><option value="商丘"><option value="信阳"><option value="周口"><option value="驻马店">
-<option value="武汉"><option value="黄石"><option value="十堰"><option value="宜昌"><option value="襄阳"><option value="鄂州"><option value="荆门"><option value="荆州"><option value="黄冈"><option value="咸宁"><option value="随州">
-<option value="长沙"><option value="株洲"><option value="湘潭"><option value="衡阳"><option value="邵阳"><option value="岳阳"><option value="常德"><option value="益阳"><option value="郴州"><option value="永州"><option value="怀化"><option value="娄底">
-<option value="广州"><option value="深圳"><option value="珠海"><option value="汕头"><option value="佛山"><option value="湛江"><option value="肇庆"><option value="江门"><option value="茂名"><option value="惠州"><option value="梅州"><option value="河源"><option value="清远"><option value="东莞"><option value="中山"><option value="潮州"><option value="揭阳">
-<option value="南宁"><option value="柳州"><option value="桂林"><option value="梧州"><option value="北海"><option value="玉林"><option value="百色"><option value="贺州"><option value="河池"><option value="崇左">
-<option value="海口"><option value="三亚">
-<option value="成都"><option value="自贡"><option value="攀枝花"><option value="泸州"><option value="德阳"><option value="绵阳"><option value="广元"><option value="遂宁"><option value="内江"><option value="乐山"><option value="南充"><option value="眉山"><option value="宜宾"><option value="广安"><option value="达州"><option value="雅安"><option value="巴中"><option value="资阳">
-<option value="贵阳"><option value="遵义"><option value="安顺"><option value="毕节">
-<option value="昆明"><option value="曲靖"><option value="玉溪"><option value="保山"><option value="昭通"><option value="丽江"><option value="普洱"><option value="临沧"><option value="西双版纳"><option value="大理">
+<option value="郑州"><option value="开封"><option value="洛阳"><option value="平顶山"><option value="安阳"><option value="鹤壁"><option value="新乡"><option value="焦作"><option value="濮阳"><option value="许昌"><option value="漯河"><option value="三门峡"><option value="南阳"><option value="商丘"><option value="信阳"><option value="周口"><option value="驻马店">
+<option value="武汉"><option value="黄石"><option value="十堰"><option value="宜昌"><option value="襄阳"><option value="鄂州"><option value="荆门"><option value="孝感"><option value="荆州"><option value="黄冈"><option value="咸宁"><option value="随州"><option value="恩施">
+<option value="长沙"><option value="株洲"><option value="湘潭"><option value="衡阳"><option value="邵阳"><option value="岳阳"><option value="常德"><option value="张家界"><option value="益阳"><option value="郴州"><option value="永州"><option value="怀化"><option value="娄底"><option value="湘西">
+<option value="广州"><option value="韶关"><option value="深圳"><option value="珠海"><option value="汕头"><option value="佛山"><option value="江门"><option value="湛江"><option value="茂名"><option value="肇庆"><option value="惠州"><option value="梅州"><option value="汕尾"><option value="河源"><option value="阳江"><option value="清远"><option value="东莞"><option value="中山"><option value="潮州"><option value="揭阳"><option value="云浮">
+<option value="南宁"><option value="柳州"><option value="桂林"><option value="梧州"><option value="北海"><option value="防城港"><option value="钦州"><option value="贵港"><option value="玉林"><option value="百色"><option value="贺州"><option value="河池"><option value="来宾"><option value="崇左">
+<option value="海口"><option value="三亚"><option value="三沙"><option value="儋州">
+<option value="成都"><option value="自贡"><option value="攀枝花"><option value="泸州"><option value="德阳"><option value="绵阳"><option value="广元"><option value="遂宁"><option value="内江"><option value="乐山"><option value="南充"><option value="眉山"><option value="宜宾"><option value="广安"><option value="达州"><option value="雅安"><option value="巴中"><option value="资阳"><option value="阿坝"><option value="甘孜"><option value="凉山">
+<option value="贵阳"><option value="六盘水"><option value="遵义"><option value="安顺"><option value="毕节"><option value="铜仁"><option value="黔西南"><option value="黔东南"><option value="黔南">
+<option value="昆明"><option value="曲靖"><option value="玉溪"><option value="保山"><option value="昭通"><option value="丽江"><option value="普洱"><option value="临沧"><option value="楚雄"><option value="红河"><option value="文山"><option value="西双版纳"><option value="大理"><option value="德宏"><option value="怒江"><option value="迪庆">
 <option value="西安"><option value="铜川"><option value="宝鸡"><option value="咸阳"><option value="渭南"><option value="延安"><option value="汉中"><option value="榆林"><option value="安康"><option value="商洛">
-<option value="兰州"><option value="嘉峪关"><option value="天水"><option value="武威"><option value="张掖"><option value="平凉"><option value="酒泉"><option value="庆阳"><option value="定西">
-<option value="西宁">
+<option value="兰州"><option value="嘉峪关"><option value="金昌"><option value="白银"><option value="天水"><option value="武威"><option value="张掖"><option value="平凉"><option value="酒泉"><option value="庆阳"><option value="定西"><option value="陇南"><option value="临夏"><option value="甘南">
+<option value="西宁"><option value="海东"><option value="海北"><option value="黄南"><option value="海南"><option value="果洛"><option value="玉树"><option value="海西">
 <option value="银川"><option value="石嘴山"><option value="吴忠"><option value="固原"><option value="中卫">
-<option value="乌鲁木齐"><option value="克拉玛依">
-<option value="香港"><option value="澳门"><option value="台北">
-</datalist>
+<option value="乌鲁木齐"><option value="克拉玛依"><option value="吐鲁番"><option value="哈密"><option value="昌吉"><option value="博尔塔拉"><option value="巴音郭楞"><option value="阿克苏"><option value="克孜勒苏"><option value="喀什"><option value="和田"><option value="伊犁"><option value="塔城"><option value="阿勒泰"><option value="石河子">
+<option value="香港"><option value="澳门"><option value="台北"><option value="高雄"><option value="台中"><option value="台南">
+  </datalist>
+
+  <script>
+    function previewAvatar(input) {
+      if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var preview = document.getElementById('avatarPreview');
+          if (!preview) {
+            preview = document.createElement('img');
+            preview.id = 'avatarPreview';
+            preview.className = 'avatar-preview';
+            var placeholder = document.querySelector('.avatar-placeholder');
+            if (placeholder) placeholder.replaceWith(preview);
+          }
+          preview.src = e.target.result;
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+    function toggleUrlUpload() {
+      document.getElementById('urlUpload').classList.toggle('show');
+    }
+  </script>
 </body>
 </html>

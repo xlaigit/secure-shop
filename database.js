@@ -44,8 +44,10 @@ db.serialize(() => {
     user_id INTEGER,
     friend_id INTEGER,
     status TEXT DEFAULT 'pending',
+    model TEXT DEFAULT 'flux',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  db.run('ALTER TABLE ai_artworks ADD COLUMN model TEXT DEFAULT \'flux\'', () => {});
 
   db.run(`CREATE TABLE IF NOT EXISTS private_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +118,8 @@ db.serialize(() => {
     `ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0`,
     `ALTER TABLE users ADD COLUMN online INTEGER DEFAULT 0`,
     `ALTER TABLE shops ADD COLUMN is_banned INTEGER DEFAULT 0`,
-    `ALTER TABLE shops ADD COLUMN warning_until TEXT DEFAULT NULL`
+    `ALTER TABLE shops ADD COLUMN warning_until TEXT DEFAULT NULL`,
+    `ALTER TABLE products ADD COLUMN shipping_policy INTEGER DEFAULT 1`
   ];
   alterCmds.forEach(sql => {
     db.run(sql, (err) => {
@@ -126,6 +129,14 @@ db.serialize(() => {
     });
   });
 
+  db.run(`CREATE TABLE IF NOT EXISTS product_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // 初始化默认商品
   db.get(`SELECT COUNT(*) as count FROM products WHERE shop_id = 0`, (err, row) => {
     if (row && row.count === 0) {
@@ -134,6 +145,46 @@ db.serialize(() => {
       db.run(`INSERT INTO products (shop_id, name, price) VALUES (0, '机械键盘', 399.0)`);
     }
   });
+
+  db.run(`CREATE TABLE IF NOT EXISTS ai_artworks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT,
+    image_url TEXT,
+    local_path TEXT DEFAULT '',
+    prompt_scene TEXT,
+    prompt_adjective TEXT,
+    prompt_characters TEXT,
+    prompt_style TEXT,
+    prompt_genre TEXT,
+    prompt_artist TEXT,
+    summary TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS daily_visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_date TEXT NOT NULL,
+    visitor_ip TEXT,
+    user_id INTEGER DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_daily_visits_date ON daily_visits (visit_date)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS daily_pv (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_date TEXT NOT NULL UNIQUE,
+    count INTEGER DEFAULT 1
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
   // 默认管理员
   const adminPassword = bcrypt.hashSync('admin123', 12);
