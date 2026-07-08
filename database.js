@@ -22,6 +22,13 @@ db.serialize(() => {
     online INTEGER DEFAULT 0,
     city TEXT DEFAULT ''
   )`);
+  db.run('ALTER TABLE user_file ADD COLUMN file_path TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN file_size INTEGER DEFAULT 0', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN mime_type TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN enc_key TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN enc_iv TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN enc_salt TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN enc_iterations INTEGER DEFAULT 0', () => {});
 
   db.run(`CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +55,31 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
   db.run('ALTER TABLE ai_artworks ADD COLUMN model TEXT DEFAULT \'flux\'', () => {});
+
+  db.run(`CREATE TABLE IF NOT EXISTS groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    creator_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS group_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    last_read_id INTEGER DEFAULT 0,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, user_id)
+  )`);
+  db.run('ALTER TABLE group_members ADD COLUMN last_read_id INTEGER DEFAULT 0', () => {});
+
+  db.run(`CREATE TABLE IF NOT EXISTS group_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER,
+    from_user INTEGER,
+    message TEXT,
+    time TEXT
+  )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS private_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,6 +149,7 @@ db.serialize(() => {
     `ALTER TABLE users ADD COLUMN warning_until TEXT DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0`,
     `ALTER TABLE users ADD COLUMN online INTEGER DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN enc_salt TEXT DEFAULT ''`,
     `ALTER TABLE shops ADD COLUMN is_banned INTEGER DEFAULT 0`,
     `ALTER TABLE shops ADD COLUMN warning_until TEXT DEFAULT NULL`,
     `ALTER TABLE products ADD COLUMN shipping_policy INTEGER DEFAULT 1`
@@ -184,6 +217,93 @@ db.serialize(() => {
     content TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 文件云盘 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS user_dir (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    parent_dir_id INTEGER DEFAULT NULL,
+    dir_name TEXT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, parent_dir_id, dir_name)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_file (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    dir_id INTEGER DEFAULT NULL,
+    file_name TEXT NOT NULL,
+    file_path TEXT DEFAULT '',
+    file_size INTEGER DEFAULT 0,
+    mime_type TEXT DEFAULT '',
+    content TEXT DEFAULT '',
+    content_length INTEGER NOT NULL DEFAULT 0,
+    enc_key TEXT DEFAULT '',
+    enc_iv TEXT DEFAULT '',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, dir_id, file_name)
+  )`);
+  db.run('ALTER TABLE user_file ADD COLUMN file_path TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN file_size INTEGER DEFAULT 0', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN mime_type TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN enc_key TEXT DEFAULT ""', () => {});
+  db.run('ALTER TABLE user_file ADD COLUMN enc_iv TEXT DEFAULT ""', () => {});
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_file_oper_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    target_type INTEGER NOT NULL,
+    target_id INTEGER NOT NULL,
+    oper_type TEXT NOT NULL,
+    oper_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark TEXT DEFAULT ''
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS file_share (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    file_id INTEGER NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    code TEXT DEFAULT '',
+    expire_time DATETIME DEFAULT NULL,
+    max_downloads INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS upload_chunk (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    upload_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    dir_id INTEGER DEFAULT NULL,
+    chunk_index INTEGER NOT NULL,
+    total_chunks INTEGER NOT NULL,
+    chunk_path TEXT NOT NULL,
+    enc_key TEXT NOT NULL,
+    enc_iv TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    mime_type TEXT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_storage_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    total_quota INTEGER NOT NULL DEFAULT 200000,
+    buy_times INTEGER NOT NULL DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_storage_buy_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    cost_coin INTEGER NOT NULL DEFAULT 200,
+    add_quota INTEGER NOT NULL DEFAULT 200000,
+    buy_time DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
   // 默认管理员

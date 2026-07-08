@@ -40,6 +40,7 @@
     .product .cat{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:600;margin-bottom:12px}
     .product .cat.official{background:#dbeafe;color:#1e40af}
     .product .cat.shop{background:#d1fae5;color:#065f46}
+    .product .thumb{width:100%;height:160px;object-fit:cover;border-radius:12px;margin-bottom:10px;background:#f3f4f6}
     .product h3{font-size:17px;font-weight:700;margin-bottom:4px;color:#111827;letter-spacing:-0.2px;line-height:1.4}
     .product .source{font-size:12.5px;color:#6b7280;margin-bottom:10px}
     .product .source strong{color:#374151}
@@ -105,9 +106,10 @@
       <a href="/orders">📋 订单</a>
       <a href="/billing">💰 账单</a>
       <a href="/friends">👥 好友</a>
-      <a href="/chat">💬 群聊</a>
+      <a href="/chat" style="position:relative">💬 群聊<span id="chatBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
       <a href="/shop/create">🏪 开店</a>
       <a href="/shop/manage">📦 我的店铺</a>
+      <a href="/cloud">☁️ 文件云盘</a>
       <a href="/notifications">📨 邮件</a>
       <a href="/appeal">📝 申诉</a>
       <a href="/profile">👤 头像</a>
@@ -232,6 +234,9 @@
       <div class="grid">
         <% products.forEach(function(p) { %>
           <div class="product">
+            <% if (typeof images !== 'undefined') { var imgs = images.filter(function(img){ return img.product_id === p.id; }); if (imgs.length > 0) { %>
+            <img class="thumb" src="<%= imgs[0].url %>" alt="<%= p.name %>" loading="lazy" onerror="this.style.display='none'">
+            <% } } %>
             <span class="cat <%= p.shop_name ? 'shop' : 'official' %>"><%= p.shop_name ? '🏪 商家商品' : '⭐ 官方推荐' %></span>
             <h3><%= p.name %></h3>
             <div class="source">来源：<strong><%= p.shop_name || '官方商城' %></strong></div>
@@ -310,7 +315,24 @@
      var el = document.querySelector('.flash-stock[data-pid="' + data.productId + '"]');
      if (el) el.textContent = data.stock;
    });
-   socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '商城首页' });
+   
+   // 未读消息处理
+   socket.on('connect', function(){
+     socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '商城首页' });
+     socket.emit('getUnread');
+   });
+   socket.on('unreadUpdate', function(data){
+     var badge = document.getElementById('chatBadge');
+     if (!badge) return;
+     var total = data.privateUnread || 0;
+     if (data.groups) data.groups.forEach(function(g){ total += g.unread || 0; });
+     badge.textContent = total > 99 ? '99+' : total;
+     badge.style.display = total > 0 ? 'inline-block' : 'none';
+   });
+   socket.on('groupUnread', function(){
+     socket.emit('getUnread');
+   });
+   
    var xhr = new XMLHttpRequest();
    xhr.open('GET', '/api/dau', true);
    xhr.onload = function() {

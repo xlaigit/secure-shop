@@ -32,6 +32,15 @@
     .side-card input[type=file]{width:100%;margin-bottom:8px}
     .side-card button{width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(90deg,var(--accent2),#059669);color:#fff;cursor:pointer}
     .pill{display:inline-block;margin:2px 4px;padding:4px 8px;background:rgba(52,211,153,0.16);color:#bbf7d0;border-radius:999px;font-size:12px}
+    .group-item{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);transition:background .15s;cursor:pointer}
+    .group-item:hover{background:rgba(56,189,248,0.08)}
+    .group-avatar{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#2563eb);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;margin-right:12px}
+    .group-info{flex:1;min-width:0}
+    .group-name{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
+    .group-preview{color:var(--muted);font-size:13px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .group-arrow{color:var(--muted);font-size:20px;margin-left:8px;flex-shrink:0}
+    .badge{display:inline-block;background:#ef4444;color:#fff;font-size:11px;min-width:18px;height:18px;line-height:18px;text-align:center;border-radius:9px;padding:0 5px;font-weight:700;animation:pulse .6s ease-in-out}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
   </style>
 </head>
 <body>
@@ -49,40 +58,20 @@
   </div>
   <div class="wrap">
     <div class="shell">
-      <div class="card chat">
+      <div class="card" style="height:620px;display:flex;flex-direction:column">
         <div class="header">
-          <div>
-            <strong>群聊会话</strong>
-            <div class="muted" style="font-size:13px">欢迎，<%= username %></div>
-          </div>
+          <div><strong>💬 群聊列表</strong></div>
+          <a href="/friends" style="background:linear-gradient(90deg,var(--accent),#2563eb);color:#fff;padding:8px 16px;border-radius:999px;text-decoration:none;font-size:14px;font-weight:600">+ 创建群聊</a>
         </div>
-        <div class="members">
-          <strong>成员：</strong>
-          <% if (groupMembers && groupMembers.length) { %>
-            <% groupMembers.forEach(function(member){ %>
-              <span class="pill"><%= member.username %></span>
-            <% }) %>
-          <% } else { %>
-            <span style="color:#94a3b8">当前为公开群聊</span>
-          <% } %>
-        </div>
-        <div class="messages" id="messages"></div>
-        <div class="input-area">
-          <input id="msgInput" placeholder="输入消息..." maxlength="500">
-          <button id="sendBtn">发送</button>
+        <div id="groupList" style="flex:1;overflow-y:auto">
+          <div style="text-align:center;padding:60px 20px;color:var(--muted)">加载中...</div>
         </div>
       </div>
       <div class="sidebar">
         <div class="card side-card">
-          <h3>📁 文件共享</h3>
-          <input type="file" id="fileInput"><br>
-          <button id="uploadBtn">上传</button>
-          <p style="font-size:12px;color:#94a3b8;margin-top:8px">最大10MB</p>
-        </div>
-        <div class="card side-card" style="background:rgba(254,202,202,0.08);border-color:rgba(239,68,68,0.25)">
-          <h3>🚩 举报中心</h3>
-          <p style="font-size:13px;color:#fecaca;margin-bottom:10px;line-height:1.5">发现不良内容、恶意用户或违规文件？点击消息旁的「举报」按钮，或使用下方通道举报当前聊天。</p>
-          <button onclick="location.href='/report?type=chat&id=general&name='+encodeURIComponent('群聊内容')" style="width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(90deg,#ef4444,#dc2626);color:#fff;cursor:pointer;font-weight:600">举报当前聊天</button>
+          <h3>📋 快捷操作</h3>
+          <a href="/friends" style="display:block;width:100%;padding:10px;text-align:center;border:none;border-radius:10px;background:linear-gradient(90deg,var(--accent),#2563eb);color:#fff;text-decoration:none;font-weight:600;margin-bottom:8px">➕ 创建群聊</a>
+          <a href="/chat/public" style="display:block;width:100%;padding:10px;text-align:center;border:none;border-radius:10px;background:linear-gradient(90deg,var(--accent2),#059669);color:#fff;text-decoration:none;font-weight:600">🌐 公共聊天室</a>
         </div>
       </div>
     </div>
@@ -91,63 +80,63 @@
   <script>
   (function(){
     var socket = io();
-    var user = '<%= username %>';
-    var csrfToken = '<%= csrfToken %>';
-    var msgs = document.getElementById('messages');
-    var inp = document.getElementById('msgInput');
-    var sendBtn = document.getElementById('sendBtn');
-    var uploadBtn = document.getElementById('uploadBtn');
-    var fileInput = document.getElementById('fileInput');
+    var userId = <%= user.id %>;
+    var username = '<%= user.username %>';
+    var listEl = document.getElementById('groupList');
 
-    function addMsg(d) {
-      var div = document.createElement('div');
-      if (d.type === 'file') {
-        div.className = 'msg file-msg';
-        var displayName = d.name || '文件';
-        var reportUrl = '/report?type=file&id=' + encodeURIComponent(displayName) + '&name=' + encodeURIComponent(d.uploader + ' 上传的文件');
-        div.innerHTML = '<div class="user">📎 ' + d.uploader + ' <a class="report" href="' + reportUrl + '">🚩 举报</a></div><div class="text"><a href="' + d.url + '" download="' + d.name + '">' + d.name + '</a> (' + (d.size/1024).toFixed(1) + 'KB)</div><div class="time">' + d.time + '</div>';
-      } else {
-        div.className = 'msg';
-        var content = (d.msg || '').substring(0, 60).replace(/[&<>"']/g, '');
-        var userReport = '/report?type=user&id=' + encodeURIComponent(d.user) + '&name=' + encodeURIComponent('用户 ' + d.user);
-        var msgReport = '/report?type=message&id=' + encodeURIComponent(d.user + '-' + d.time) + '&name=' + encodeURIComponent(d.user + ' 的消息');
-        div.innerHTML = '<div class="user">' + d.user + ' <a class="report" href="' + userReport + '">🚩 举报用户</a> <a class="report" href="' + msgReport + '">🚩 举报消息</a></div><div class="text">' + d.msg + '</div><div class="time">' + d.time + '</div>';
-      }
-      msgs.appendChild(div);
-      msgs.scrollTop = msgs.scrollHeight;
-    }
-
-    function sendMsg() {
-      var m = inp.value.trim();
-      if (!m) return;
-      socket.emit('msg', { user: user, msg: m });
-      inp.value = '';
-    }
-
-    socket.on('history', function(ms) { ms.forEach(addMsg); });
-    socket.on('msg', addMsg);
-
-    sendBtn.onclick = sendMsg;
-    inp.onkeypress = function(e) { if (e.key === 'Enter') sendMsg(); };
-
-    uploadBtn.onclick = function() {
-      var file = fileInput.files[0];
-      if (!file) return alert('请选择文件');
-      if (file.size > 10 * 1024 * 1024) return alert('最大10MB');
-      var formData = new FormData();
-      formData.append('file', file);
-      formData.append('_csrf', csrfToken);
-      fetch('/chat/upload', {
-        method: 'POST',
-        body: formData
-      }).then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.error) alert(data.error);
-        else fileInput.value = '';
-      }).catch(function(err) {
-        alert('上传失败: ' + err.message);
+    function loadGroups() {
+      fetch('/api/groups').then(function(r){return r.json()}).then(function(groups){
+        if (!groups.length) {
+          listEl.innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:12px">💬</div><div style="color:var(--muted);margin-bottom:16px">还没有群聊</div><a href="/friends" style="display:inline-block;padding:10px 24px;background:linear-gradient(90deg,var(--accent),#2563eb);color:#fff;border-radius:999px;text-decoration:none;font-weight:600">去创建群聊</a></div>';
+          return;
+        }
+        var html = '';
+        groups.forEach(function(g){
+          var badge = g.unread > 0 ? '<span class="badge">'+g.unread+'</span>' : '';
+          html += '<a href="/chat/group/'+g.id+'" class="group-item" data-id="'+g.id+'">'+
+            '<div class="group-avatar">'+g.name.charAt(0)+'</div>'+
+            '<div class="group-info"><div class="group-name">'+g.name+badge+'</div>'+
+            '<div class="group-preview">'+g.unread+' 条未读消息</div></div>'+
+            '<div class="group-arrow">›</div></a>';
+        });
+        listEl.innerHTML = html;
       });
-    };
+    }
+
+    socket.on('connect', function(){
+      socket.emit('login', { id: userId, username: username, page: '群聊列表' });
+      socket.emit('getUnread');
+      loadGroups();
+    });
+
+    socket.on('groupUnread', function(data){
+      var el = document.querySelector('.group-item[data-id="'+data.groupId+'"]');
+      if (el) {
+        var badge = el.querySelector('.badge');
+        if (data.unread > 0) {
+          if (badge) badge.textContent = data.unread;
+          else {
+            var nb = document.createElement('span');
+            nb.className = 'badge';
+            nb.textContent = data.unread;
+            el.querySelector('.group-name').appendChild(nb);
+          }
+        } else {
+          if (badge) badge.remove();
+        }
+      }
+    });
+
+    socket.on('unreadUpdate', function(data){
+      loadGroups();
+      var badge = document.getElementById('chatBadge');
+      if (badge) {
+        var total = data.privateUnread || 0;
+        if (data.groups) data.groups.forEach(function(g){ total += g.unread || 0; });
+        badge.textContent = total > 99 ? '99+' : total;
+        badge.style.display = total > 0 ? 'inline-block' : 'none';
+      }
+    });
   })();
   </script>
 </body>

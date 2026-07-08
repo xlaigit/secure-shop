@@ -28,6 +28,7 @@ const http = require('http');
 const fs = require('fs');
 const socketio = require('socket.io');
 const crypto = require('crypto');
+const { ENC_MAGIC, ENC_ALGO, ENC_VERSION, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST, ENC_GLOBAL_SALT, HDR_MIN_SIZE, parseEncFileHeader, deriveAesKey, encryptFileStream, decryptToStream, decryptToBuffer, decryptText } = require('./crypto-utils');
 const url = require('url');
 
 // ========== SSRF 防护：阻止访问内网、本地、云元数据地址 ==========
@@ -57,6 +58,7 @@ function isSafeUrl(targetUrl) {
 const app = express();
 app.set('trust proxy', 1);
 const httpServer = http.createServer(app);
+httpServer.timeout = 600000;
 const io = socketio(httpServer, { cors: { origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], methods: ['GET', 'POST'] } });
 
 app.use(express.static('public'));
@@ -65,6 +67,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
       fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
@@ -132,7 +135,11 @@ function generateCaptcha() {
 
 const storage = multer.diskStorage({
   destination: 'public/uploads/',
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, '');
+    cb(null, Date.now() + '-' + (name || 'file') + ext);
+  }
 });
 const fileFilter = (req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf', 'text/plain', 'application/zip', 'application/x-zip-compressed'];
@@ -355,6 +362,13 @@ app.post('/login', loginLimiter, (req, res) => {
             reputation: user.reputation, warningActive, warningUntil,
             isAdmin: !!user.is_admin, shopId: null, shopName: ''
           };
+          // 派生 AES 密钥: PBKDF2(密码, 全局盐+用户盐, 迭代, 32, sha256)
+          const userSalt = user.enc_salt ? Buffer.from(user.enc_salt, 'hex') : crypto.randomBytes(16);
+          if (!user.enc_salt) {
+            db.run('UPDATE users SET enc_salt = ? WHERE id = ?', [userSalt.toString('hex'), user.id]);
+          }
+          req.session.user.encKey = crypto.pbkdf2Sync(p, Buffer.concat([ENC_GLOBAL_SALT, userSalt]), PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST).toString('hex');
+          req.session.user.encSalt = userSalt.toString('hex');
           db.get('SELECT id, name, is_banned, warning_until FROM shops WHERE owner_id = ?', [user.id], (err2, shop) => {
             if (!err2 && shop) {
               req.session.user.shopId = shop.id;
@@ -410,12 +424,15 @@ app.get('/shop', isAuth, (req, res) => {
         WHERE o.user_id = ? AND s.status IN ('shipped','delivered')
         ORDER BY s.shipped_at DESC LIMIT 5`, [req.session.user.id], (err3, shipments) => {
         db.all('SELECT * FROM announcements WHERE is_active = 1 ORDER BY id DESC', (err4, announcements) => {
+        db.all('SELECT * FROM product_images', (err5, images) => {
         res.render('shop', { 
           products, flashSales, shipments: shipments || [],
           announcements: announcements || [],
+          images: images || [],
           balance: req.session.user.balance, 
           warningActive: req.session.user.warningActive, 
           warningUntil: req.session.user.warningUntil 
+        });
         });
         });
       }); 
@@ -762,7 +779,8 @@ app.post('/upload', isAuth, (req, res) => {
 
 // ========== 聊天室 ==========
 const chatHistory = [];
-app.get('/chat', isAuth, (req, res) => res.render('chat', { username: req.session.user.username, groupMembers: req.session.groupMembers || [] }));
+app.get('/chat', isAuth, (req, res) => res.render('chat', { username: req.session.user.username }));
+app.get('/chat/public', isAuth, (req, res) => res.render('chat_public', { username: req.session.user.username }));
 app.post('/chat/upload', isAuth, (req, res) => {
   chatUpload.single('file')(req, res, function (err) {
     if (err) return res.json({ error: '上传失败' });
@@ -817,27 +835,59 @@ app.post('/friend/delete/:id', isAuth, (req, res) => {
 });
 
 app.post('/friend/group', isAuth, (req, res) => {
-  const friends = req.body.friends;
-  if (!Array.isArray(friends) || friends.length < 1) {
+  const friendIds = req.body.friend_ids;
+  if (!friendIds || friendIds.length < 1) {
     return res.send('请至少选择一个好友');
   }
-  // 检查好友关系
-  let ok = true;
-  friends.forEach(id => {
-    if (!req.session.friends || !req.session.friends.includes(parseInt(id))) ok = false;
+  const ids = Array.isArray(friendIds) ? friendIds.map(x => parseInt(x)) : [parseInt(friendIds)];
+  const allIds = [...ids, req.session.user.id];
+  const placeholders = ids.map(() => '?').join(',');
+  db.all(`SELECT u.id, u.username FROM users u
+    JOIN friends f ON (f.user_id = u.id AND f.friend_id = ?) OR (f.user_id = ? AND f.friend_id = u.id)
+    WHERE u.id IN (${placeholders}) AND f.status = 'accepted'`,
+    [req.session.user.id, req.session.user.id, ...ids], (err, rows) => {
+    if (err || rows.length < ids.length) return res.send('只能邀请好友');
+    const names = rows.map(r => r.username);
+    names.push(req.session.user.username);
+    const name = names.join('、');
+    db.run('INSERT INTO groups (name, creator_id) VALUES (?, ?)', [name, req.session.user.id], function(err) {
+      if (err) return res.send('创建群聊失败');
+      const groupId = this.lastID;
+      const stmt = db.prepare('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)');
+      allIds.forEach(uid => stmt.run(groupId, uid));
+      stmt.finalize();
+      res.redirect('/chat/group/' + groupId);
+    });
   });
-  if (!ok) return res.send('只能邀请好友');
-  // 加上自己
-  const all = [...friends.map(x => parseInt(x)), req.session.user.id];
-  const name = all.map(id => {
-    const u = req.session.allUsers?.find(x => x.id == id);
-    return u ? u.username : '用户' + id;
-  }).join(', ');
-  // 创建房间
-  const roomId = 'group_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-  // 保存到 session 跳转
-  req.session.groupRoom = { id: roomId, name: name, members: all };
-  res.redirect('/chat/group/' + roomId);
+});
+
+// ========== 群聊页面 ==========
+app.get('/chat/group/:id', isAuth, (req, res) => {
+  const gid = parseInt(req.params.id);
+  db.get('SELECT * FROM groups WHERE id = ?', [gid], (err, group) => {
+    if (err || !group) return res.status(404).send('群聊不存在');
+    db.get('SELECT id FROM group_members WHERE group_id = ? AND user_id = ?', [gid, req.session.user.id], (err, member) => {
+      if (!member) return res.status(403).send('你不是该群成员');
+      db.all(`SELECT u.id, u.username, u.avatar FROM group_members gm
+        JOIN users u ON gm.user_id = u.id WHERE gm.group_id = ?`, [gid], (err, members) => {
+        db.all(`SELECT gm.id, gm.from_user, u.username, u.avatar, gm.message, gm.time
+          FROM group_messages gm JOIN users u ON gm.from_user = u.id
+          WHERE gm.group_id = ? ORDER BY gm.id LIMIT 100`, [gid], (err, msgs) => {
+          res.render('group_chat', { group, members, messages: msgs, csrfToken: req.csrfToken ? req.csrfToken() : '' });
+        });
+      });
+    });
+  });
+});
+
+// ========== 我的群列表 ==========
+app.get('/api/groups', isAuth, (req, res) => {
+  db.all(`SELECT g.*, (SELECT COUNT(*) FROM group_messages gm WHERE gm.group_id = g.id AND gm.id > COALESCE((SELECT last_read_id FROM group_members WHERE group_id = g.id AND user_id = ?), 0)) as unread
+    FROM groups g JOIN group_members gm ON g.id = gm.group_id
+    WHERE gm.user_id = ? ORDER BY g.id DESC`, [req.session.user.id, req.session.user.id], (err, rows) => {
+    if (err) return res.json([]);
+    res.json(rows);
+  });
 });
 
 // ========== 私聊 ==========
@@ -1541,7 +1591,1004 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
     });
 });
 
-  // ========== Socket.IO ==========
+// ========== 文件云盘 ==========
+
+// 云盘上传 multer（边上传边加密，只写一次盘）
+const cloudUpload = multer({
+  storage: {
+    _handleFile(req, file, cb) {
+      const uid = req.session.user.id;
+      const dir = path.join('public', 'uploads', 'cloud', String(uid));
+      fs.mkdirSync(dir, { recursive: true });
+      const safe = file.originalname.replace(/[\\/:*?"<>|]/g, '_');
+      const fname = Date.now() + '_' + safe;
+      const finalPath = path.join(dir, fname);
+      const encKey = req.session.user && req.session.user.encKey ? Buffer.from(req.session.user.encKey, 'hex') : crypto.randomBytes(32);
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
+      const out = fs.createWriteStream(finalPath);
+      const hdr = Buffer.alloc(12 + 12 + 16);
+      hdr.write(ENC_MAGIC, 0, 8, 'utf8');
+      hdr.writeUInt16BE(ENC_VERSION, 8);
+      hdr.writeUInt8(12, 10);
+      hdr.writeUInt8(16, 11);
+      iv.copy(hdr, 12);
+      out.write(hdr);
+      let uploaded = 0;
+      file.stream.on('data', chunk => { uploaded += chunk.length; });
+      file.stream.pipe(cipher).pipe(out);
+      cipher.on('final', () => {
+        const tag = cipher.getAuthTag();
+        tag.copy(hdr, 12 + 12);
+        const fd = fs.openSync(finalPath, 'r+');
+        fs.writeSync(fd, hdr, 12 + 12, 16, 12 + 12);
+        fs.closeSync(fd);
+      });
+      out.on('error', cb);
+      out.on('finish', () => cb(null, { destination: dir, filename: fname, path: finalPath, size: uploaded }));
+    },
+    _removeFile(req, file, cb) { fs.unlink(file.path, cb); }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const blocked = ['.exe','.bat','.cmd','.sh','.php','.asp','.aspx','.jsp','.dll','.so','.msi','.scr','.vbs','.ps1','.jar','.war','.com','.pif','.cgi','.pl','.py','.rb','.reg','.hta','.wsf'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (blocked.includes(ext)) return cb(new Error('禁止上传可执行/脚本文件'));
+    cb(null, true);
+  }
+});
+
+// 限流器
+const fileRateLimit = {};
+function checkFileRateLimit(uid) {
+  const now = Date.now();
+  if (!fileRateLimit[uid]) fileRateLimit[uid] = [];
+  fileRateLimit[uid] = fileRateLimit[uid].filter(t => now - t < 60000);
+  if (fileRateLimit[uid].length >= 10) return false;
+  fileRateLimit[uid].push(now);
+  return true;
+}
+
+// 文件名校验
+const forbiddenChars = /[\\/:*?"<>|]/;
+function validateFileName(name) {
+  if (!name || name.length < 1 || name.length > 100) return false;
+  if (forbiddenChars.test(name)) return false;
+  return true;
+}
+
+// 确保存储配置
+function ensureStorageConfig(uid, cb) {
+  db.get('SELECT * FROM user_storage_config WHERE user_id = ?', [uid], (err, cfg) => {
+    if (err) { console.error('ensureStorageConfig db.get error:', err); return cb(err); }
+    if (cfg) return cb(null, cfg);
+    db.run('INSERT INTO user_storage_config (user_id, total_quota, buy_times) VALUES (?, 200000, 0)', [uid], function(err) {
+      if (err) { console.error('ensureStorageConfig insert error:', err); return cb(err); }
+      cb(null, { user_id: uid, total_quota: 200000, buy_times: 0 });
+    });
+  });
+}
+
+// 操作日志
+function logOper(uid, targetType, targetId, operType, remark) {
+  db.run('INSERT INTO user_file_oper_log (user_id, target_type, target_id, oper_type, remark) VALUES (?,?,?,?,?)',
+    [uid, targetType, targetId, operType, remark || '']);
+}
+
+// ========== 加密工具已整合至 crypto-utils.js，通过 require 导入 ==========
+const SERVER_ENC_SECRET = crypto.createHash('sha256').update('CLOUD_DISK_SERVER_KEY_' + (process.env.SECRET || 'default')).digest();
+
+function xorEncrypt(buf, secret) {
+  const result = Buffer.alloc(buf.length);
+  for (let i = 0; i < buf.length; i++) result[i] = buf[i] ^ secret[i % secret.length];
+  return result;
+}
+
+function getSessionKey(req) {
+  if (!req.session || !req.session.user || !req.session.user.encKey) return null;
+  return Buffer.from(req.session.user.encKey, 'hex');
+}
+
+function getFileEncKey(req, file) {
+  if (file.enc_key) return Buffer.from(file.enc_key, 'hex');
+  if (file.enc_iterations === 0 && file.enc_salt) {
+    return xorEncrypt(Buffer.from(file.enc_salt, 'hex'), SERVER_ENC_SECRET);
+  }
+  return getSessionKey(req);
+}
+
+function migrateOldFileSync(filePath, file) {
+  if (!file.enc_key || !file.enc_iv) return false;
+  const hdr8 = Buffer.alloc(8);
+  const fd = fs.openSync(filePath, 'r');
+  fs.readSync(fd, hdr8, 0, 8, 0);
+  fs.closeSync(fd);
+  if (hdr8.toString('utf8', 0, 8) !== 'CLOUDENC') return false;
+  const oldKey = Buffer.from(file.enc_key, 'hex');
+  const oldIv = Buffer.from(file.enc_iv, 'hex');
+  const encBuf = fs.readFileSync(filePath);
+  const decipher = crypto.createDecipheriv('aes-256-cbc', oldKey, oldIv);
+  const plain = Buffer.concat([decipher.update(encBuf.slice(8)), decipher.final()]);
+  const newIv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', oldKey, newIv);
+  const newHdr = Buffer.alloc(40);
+  newHdr.write('CLOUDENV2', 0, 8, 'utf8');
+  newHdr.writeUInt16BE(ENC_VERSION, 8);
+  newHdr.writeUInt8(12, 10);
+  newHdr.writeUInt8(16, 11);
+  newIv.copy(newHdr, 12);
+  const newEnc = Buffer.concat([newHdr, cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  tag.copy(newEnc, 24);
+  const tmpPath = filePath + '.mig';
+  fs.writeFileSync(tmpPath, newEnc);
+  fs.unlinkSync(filePath);
+  fs.renameSync(tmpPath, filePath);
+  const encSalt = xorEncrypt(oldKey, SERVER_ENC_SECRET).toString('hex');
+  db.run('UPDATE user_file SET enc_salt = ?, enc_iterations = 0, enc_key = \"\", enc_iv = \"\" WHERE id = ?', [encSalt, file.id]);
+  file.enc_key = null;
+  file.enc_iv = null;
+  file.enc_salt = encSalt;
+  file.enc_iterations = 0;
+  return true;
+}
+
+// 递归获取子孙文件夹ID
+function getDescendantDirIds(uid, dirId, cb) {
+  db.all('SELECT id FROM user_dir WHERE user_id = ? AND parent_dir_id = ?', [uid, dirId], (err, children) => {
+    if (err || !children.length) return cb(null, [dirId]);
+    let ids = [dirId], pending = children.length;
+    children.forEach(c => {
+      getDescendantDirIds(uid, c.id, (e, subIds) => {
+        ids = ids.concat(subIds);
+        if (--pending === 0) cb(null, ids);
+      });
+    });
+  });
+}
+
+// 云盘主页
+app.get('/cloud', isAuth, (req, res) => res.render('cloud_disk'));
+
+// 存储信息
+app.get('/api/cloud/storage', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  ensureStorageConfig(uid, (err, cfg) => {
+    if (err) return res.status(500).json({ error: '获取配置失败' });
+    db.get('SELECT COALESCE(SUM(file_size),0) + COALESCE(SUM(content_length),0) as used FROM user_file WHERE user_id = ?', [uid], (err, r1) => {
+      db.get('SELECT COUNT(*) as cnt FROM user_file WHERE user_id = ?', [uid], (err, r2) => {
+        db.get('SELECT COUNT(*) as cnt FROM user_dir WHERE user_id = ?', [uid], (err, r3) => {
+          db.get('SELECT balance FROM users WHERE id = ?', [uid], (err, r4) => {
+            res.json({ totalQuota: cfg.total_quota, usedQuota: r1.used, fileCount: r2.cnt, folderCount: r3.cnt, maxFiles: 100, maxFolders: 20, balance: r4 ? r4.balance : 0 });
+          });
+        });
+      });
+    });
+  });
+});
+
+// 文件夹树
+app.get('/api/cloud/tree', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  db.all('SELECT * FROM user_dir WHERE user_id = ? ORDER BY dir_name', [uid], (err, dirs) => {
+    if (err) return res.json([]);
+    function buildTree(parentId) {
+      return dirs.filter(d => d.parent_dir_id === parentId).map(d => ({
+        id: d.id, name: d.dir_name, children: buildTree(d.id)
+      }));
+    }
+    res.json(buildTree(null));
+  });
+});
+
+// 解析文件夹路径
+function resolveDirPath(uid, dirId, cb) {
+  if (!dirId) return cb(null, '');
+  db.get('SELECT * FROM user_dir WHERE id = ? AND user_id = ?', [dirId, uid], (err, dir) => {
+    if (!dir) return cb(null, '');
+    resolveDirPath(uid, dir.parent_dir_id, (e, parentPath) => {
+      cb(null, parentPath ? parentPath + '/' + dir.dir_name : dir.dir_name);
+    });
+  });
+}
+
+// 获取目录内容 + 面包屑
+app.get('/api/cloud/list', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const dirId = req.query.dir_id ? parseInt(req.query.dir_id) : null;
+
+  db.all('SELECT * FROM user_dir WHERE user_id = ? AND parent_dir_id IS ? ORDER BY dir_name', [uid, dirId], (err, folders) => {
+    db.all('SELECT * FROM user_file WHERE user_id = ? AND dir_id IS ? ORDER BY file_name', [uid, dirId], (err, files) => {
+      function getBreadcrumb(id, cb) {
+        if (!id) return cb([{ id: null, name: '根目录' }]);
+        db.get('SELECT * FROM user_dir WHERE id = ? AND user_id = ?', [id, uid], (err, d) => {
+          if (!d) return cb([{ id: null, name: '根目录' }]);
+          getBreadcrumb(d.parent_dir_id, (parents) => {
+            parents.push({ id: d.id, name: d.dir_name });
+            cb(parents);
+          });
+        });
+      }
+      getBreadcrumb(dirId, (breadcrumb) => {
+        res.json({ folders, files, breadcrumb });
+      });
+    });
+  });
+});
+
+// ========== 分片上传 ==========
+const CHUNK_SIZE = 5 * 1024 * 1024; // 每片 5MB
+const chunkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'public', 'uploads', 'cloud', 'chunks', String(req.session.user.id), req.body.upload_id);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => cb(null, String(req.body.chunk_index))
+});
+const chunkUpload = multer({ storage: chunkStorage, limits: { fileSize: CHUNK_SIZE + 1024 * 1024 } });
+
+// 初始化上传
+app.post('/api/cloud/upload/init', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const { file_name, file_size, mime_type, total_chunks } = req.body;
+  if (!file_name || !file_size || !total_chunks) return res.status(400).json({ error: '参数不完整' });
+  if (!validateFileName(file_name)) return res.status(400).json({ error: '文件名不合法' });
+  const uploadId = require('uuid').v4().replace(/-/g, '');
+  const encKey = crypto.randomBytes(32).toString('hex');
+  const encIv = crypto.randomBytes(16).toString('hex');
+  db.run('INSERT INTO upload_chunk (upload_id, user_id, file_name, dir_id, chunk_index, total_chunks, chunk_path, enc_key, enc_iv, file_size, mime_type) VALUES (?,?,?,?,0,?,?,?,?,?,?)',
+    [uploadId, uid, file_name, null, total_chunks, '', encKey, encIv, file_size, mime_type || 'application/octet-stream'], (err) => {
+    if (err) return res.status(500).json({ error: '初始化失败' });
+    res.json({ upload_id: uploadId, enc_key: encKey, enc_iv: encIv });
+  });
+});
+
+// 上传分片
+app.post('/api/cloud/upload/chunk', isAuth, (req, res) => {
+  req.setTimeout(0);
+  const uid = req.session.user.id;
+  chunkUpload.single('chunk')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    const { upload_id, chunk_index } = req.body;
+    if (!upload_id || chunk_index === undefined) return res.status(400).json({ error: '参数不完整' });
+    db.run('UPDATE upload_chunk SET chunk_path = chunk_path || ? || \',\' WHERE upload_id = ? AND user_id = ? AND chunk_index = 0',
+      [req.file.path, upload_id, uid], (err2) => {
+      if (err2) return res.status(500).json({ error: '保存分片失败' });
+      res.json({ ok: true, chunk_index: parseInt(chunk_index) });
+    });
+  });
+});
+
+// 合并分片
+app.post('/api/cloud/upload/merge', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const { upload_id, dir_id } = req.body;
+  if (!upload_id) return res.status(400).json({ error: '缺少 upload_id' });
+  db.get('SELECT * FROM upload_chunk WHERE upload_id = ? AND user_id = ? AND chunk_index = 0', [upload_id, uid], (err, meta) => {
+    if (err || !meta) return res.status(404).json({ error: '上传会话不存在' });
+    const chunkPaths = meta.chunk_path.split(',').filter(Boolean);
+    if (chunkPaths.length < meta.total_chunks) return res.status(400).json({ error: '分片不完整，已上传 ' + chunkPaths.length + '/' + meta.total_chunks });
+    
+    ensureStorageConfig(uid, (err2, cfg) => {
+      db.get('SELECT COALESCE(SUM(file_size),0)+COALESCE(SUM(content_length),0) as used FROM user_file WHERE user_id = ?', [uid], (err3, r) => {
+        if (r.used + meta.file_size > cfg.total_quota) return res.status(400).json({ error: '存储空间不足' });
+        
+        const finalDir = path.join(__dirname, 'public', 'uploads', 'cloud', String(uid));
+        fs.mkdirSync(finalDir, { recursive: true });
+        const safe = meta.file_name.replace(/[\\/:*?"<>|]/g, '_');
+        const finalName = Date.now() + '_' + safe;
+        const finalPath = path.join(finalDir, finalName);
+        
+        const encKey = req.session.user && req.session.user.encKey ? Buffer.from(req.session.user.encKey, 'hex') : crypto.randomBytes(32);
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
+        const out = fs.createWriteStream(finalPath);
+        const hdr = Buffer.alloc(40);
+        hdr.write(ENC_MAGIC, 0, 8, 'utf8');
+        hdr.writeUInt16BE(ENC_VERSION, 8);
+        hdr.writeUInt8(12, 10);
+        hdr.writeUInt8(16, 11);
+        iv.copy(hdr, 12);
+        out.write(hdr);
+        
+        let idx = 0;
+        function pipeNext() {
+          if (idx >= chunkPaths.length) {
+            cipher.end();
+            return;
+          }
+          const cp = chunkPaths[idx];
+          if (!fs.existsSync(cp)) { out.destroy(); return res.status(500).json({ error: '分片文件丢失: ' + idx }); }
+          fs.createReadStream(cp).on('end', () => { idx++; pipeNext(); }).on('error', (e) => { out.destroy(); res.status(500).json({ error: '读取分片失败' }); }).pipe(cipher, { end: false });
+        }
+        cipher.pipe(out);
+        cipher.on('final', () => {
+          const tag = cipher.getAuthTag();
+          tag.copy(hdr, 24);
+          const fd = fs.openSync(finalPath, 'r+');
+          fs.writeSync(fd, hdr, 24, 16, 24);
+          fs.closeSync(fd);
+        });
+        out.on('finish', () => {
+          const relPath = 'uploads/cloud/' + uid + '/' + finalName;
+          const salt = req.session.user && req.session.user.encSalt || '';
+          db.run('INSERT INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_salt, enc_iterations) VALUES (?,?,?,?,?,?,0,?,?)',
+            [uid, dir_id || null, meta.file_name, relPath, meta.file_size, meta.mime_type, salt, PBKDF2_ITERATIONS], function(err4) {
+            if (err4) { fs.unlink(finalPath, () => {}); return res.status(400).json({ error: '保存失败' }); }
+            // 清理分片
+            chunkPaths.forEach(p => fs.unlink(p, () => {}));
+            const chunkDir = path.dirname(chunkPaths[0]);
+            fs.rmdir(chunkDir, () => {});
+            db.run('DELETE FROM upload_chunk WHERE upload_id = ?', [upload_id]);
+            logOper(uid, 2, this.lastID, 'create', '上传文件: ' + meta.file_name);
+            res.json({ ok: true, id: this.lastID, file_name: meta.file_name, file_size: meta.file_size });
+          });
+        });
+        out.on('error', () => { if (!res.headersSent) res.status(500).json({ error: '合并失败' }); });
+        pipeNext();
+      });
+    });
+  });
+});
+
+// 上传文件（兼容旧版单体上传）
+app.post('/api/cloud/upload', isAuth, (req, res) => {
+  req.setTimeout(0);
+  const uid = req.session.user.id;
+  if (!checkFileRateLimit(uid)) return res.status(429).json({ error: '操作太频繁，请1分钟后再试' });
+
+  db.get('SELECT COUNT(*) as cnt FROM user_file WHERE user_id = ?', [uid], (err, r) => {
+    if (r.cnt >= 100) return res.status(400).json({ error: '文件数量已达上限（100个）' });
+
+    cloudUpload.single('file')(req, res, function(err) {
+      if (err) return res.status(400).json({ error: err.message || '上传失败' });
+      if (!req.file) return res.status(400).json({ error: '请选择文件' });
+
+      const dirId = req.body.dir_id ? parseInt(req.body.dir_id) : null;
+      const originalName = req.file.originalname;
+
+      if (!validateFileName(originalName)) return res.status(400).json({ error: '文件名不合法' });
+
+      ensureStorageConfig(uid, (err, cfg) => {
+        db.get('SELECT COALESCE(SUM(file_size),0)+COALESCE(SUM(content_length),0) as used FROM user_file WHERE user_id = ?', [uid], (err, r2) => {
+          const realSize = fs.statSync(req.file.path).size - 40;
+          if (r2.used + realSize > cfg.total_quota) {
+            fs.unlink(req.file.path, () => {});
+            return res.status(400).json({ error: '存储空间不足，请扩容或清理文件' });
+          }
+
+          const relPath = 'uploads/cloud/' + uid + '/' + req.file.filename;
+          const salt = req.session.user && req.session.user.encSalt || '';
+          db.run('INSERT INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_salt, enc_iterations) VALUES (?,?,?,?,?,?,0,?,?)',
+            [uid, dirId, originalName, relPath, realSize, req.file.mimetype, salt, PBKDF2_ITERATIONS], function(err2) {
+            if (err2) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: '保存失败，可能同名文件已存在' }); }
+            logOper(uid, 2, this.lastID, 'create', '上传文件: ' + originalName);
+            res.json({ id: this.lastID, file_name: originalName, file_size: req.file.size, mime_type: req.file.mimetype });
+          });
+        });
+      });
+    });
+  });
+});
+
+// 创建文件夹
+app.post('/api/cloud/folder/create', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const name = (req.body.dir_name || '').trim();
+  const parentId = req.body.parent_dir_id ? parseInt(req.body.parent_dir_id) : null;
+  if (!validateFileName(name)) return res.status(400).json({ error: '文件夹名不合法（1-100字符，不含 /\\:*?"<>|）' });
+
+  db.get('SELECT COUNT(*) as cnt FROM user_dir WHERE user_id = ?', [uid], (err, r) => {
+    if (r.cnt >= 20) return res.status(400).json({ error: '文件夹数量已达上限（20个）' });
+    db.run('INSERT INTO user_dir (user_id, parent_dir_id, dir_name) VALUES (?,?,?)', [uid, parentId, name], function(err) {
+      if (err) return res.status(400).json({ error: '创建失败，可能同名文件夹已存在' });
+      logOper(uid, 1, this.lastID, 'create', '创建文件夹: ' + name);
+      res.json({ id: this.lastID });
+    });
+  });
+});
+
+// 重命名文件夹
+app.post('/api/cloud/folder/rename', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  const newName = (req.body.new_name || '').trim();
+  if (!id || !validateFileName(newName)) return res.status(400).json({ error: '名称不合法' });
+  db.get('SELECT * FROM user_dir WHERE id = ? AND user_id = ?', [id, uid], (err, dir) => {
+    if (!dir) return res.status(404).json({ error: '文件夹不存在' });
+    if (dir.parent_dir_id === null) return res.status(400).json({ error: '根目录禁止重命名' });
+    db.run('UPDATE user_dir SET dir_name = ? WHERE id = ? AND user_id = ?', [newName, id, uid], function(err) {
+      if (err) return res.status(400).json({ error: '重命名失败，可能同名已存在' });
+      logOper(uid, 1, id, 'rename', dir.dir_name + ' → ' + newName);
+      res.json({ ok: true });
+    });
+  });
+});
+
+// 移动文件夹
+app.post('/api/cloud/folder/move', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  const newParent = req.body.new_parent_id ? parseInt(req.body.new_parent_id) : null;
+  if (!id) return res.status(400).json({ error: '参数错误' });
+  db.get('SELECT * FROM user_dir WHERE id = ? AND user_id = ?', [id, uid], (err, dir) => {
+    if (!dir) return res.status(404).json({ error: '文件夹不存在' });
+    getDescendantDirIds(uid, id, (e, descIds) => {
+      if (newParent && descIds.includes(newParent)) return res.status(400).json({ error: '不能移动到自身或子文件夹' });
+      db.run('UPDATE user_dir SET parent_dir_id = ? WHERE id = ? AND user_id = ?', [newParent, id, uid], function(err) {
+        if (err) return res.status(400).json({ error: '移动失败' });
+        logOper(uid, 1, id, 'move', '移动到 ' + (newParent || '根目录'));
+        res.json({ ok: true });
+      });
+    });
+  });
+});
+
+// 递归删除文件夹
+app.post('/api/cloud/folder/delete', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  if (!id) return res.status(400).json({ error: '参数错误' });
+  db.get('SELECT * FROM user_dir WHERE id = ? AND user_id = ?', [id, uid], (err, dir) => {
+    if (!dir) return res.status(404).json({ error: '文件夹不存在' });
+    if (dir.parent_dir_id === null) return res.status(400).json({ error: '根目录禁止删除' });
+    getDescendantDirIds(uid, id, (e, descIds) => {
+      const ph = descIds.map(() => '?').join(',');
+      // 先删除关联文件
+      db.all(`SELECT file_path FROM user_file WHERE user_id = ? AND dir_id IN (${ph})`, [uid, ...descIds], (err, files) => {
+        files.forEach(f => { if (f.file_path) fs.unlink(path.join('public', f.file_path), () => {}); });
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION');
+          db.run(`DELETE FROM user_file WHERE user_id = ? AND dir_id IN (${ph})`, [uid, ...descIds]);
+          db.run(`DELETE FROM user_dir WHERE user_id = ? AND id IN (${ph})`, [uid, ...descIds]);
+          db.run('COMMIT', (err) => {
+            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: '删除失败' }); }
+            logOper(uid, 1, id, 'delete', '删除文件夹: ' + dir.dir_name);
+            res.json({ ok: true });
+          });
+        });
+      });
+    });
+  });
+});
+
+// 创建文本文件
+app.post('/api/cloud/file/create', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const name = (req.body.file_name || '').trim();
+  const dirId = req.body.dir_id ? parseInt(req.body.dir_id) : null;
+  if (!checkFileRateLimit(uid)) return res.status(429).json({ error: '操作太频繁，请1分钟后再试' });
+  if (!validateFileName(name)) return res.status(400).json({ error: '文件名不合法（1-100字符）' });
+  db.get('SELECT COUNT(*) as cnt FROM user_file WHERE user_id = ?', [uid], (err, r) => {
+    if (r.cnt >= 100) return res.status(400).json({ error: '文件数量已达上限（100个）' });
+    db.run('INSERT INTO user_file (user_id, dir_id, file_name, content, content_length, file_size) VALUES (?,?,?,?,0,0)',
+      [uid, dirId, name, ''], function(err) {
+      if (err) return res.status(400).json({ error: '创建失败，可能同名文件已存在' });
+      logOper(uid, 2, this.lastID, 'create', '创建文件: ' + name);
+      res.json({ id: this.lastID });
+    });
+  });
+});
+
+// 读取文件
+app.get('/api/cloud/file/read', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.query.id);
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (file.file_path) {
+      const filePath = path.join(__dirname, 'public', file.file_path);
+      if (!fs.existsSync(filePath)) return res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+        file_size: file.file_size, mime_type: file.mime_type, content: '', content_length: 0 });
+      if (file.enc_key || file.enc_salt) {
+        try {
+          if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+          const encKey = getFileEncKey(req, file);
+          if (!encKey) return res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+            file_size: file.file_size, mime_type: file.mime_type, content: '', content_length: 0 });
+          const data = decryptText(filePath, encKey);
+          res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+            file_size: file.file_size, mime_type: file.mime_type, content: data, content_length: data.length });
+        } catch (e) {
+          res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+            file_size: file.file_size, mime_type: file.mime_type, content: '', content_length: 0 });
+        }
+      } else {
+        fs.readFile(filePath, 'utf-8', (err, data) => {
+          if (err) return res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+            file_size: file.file_size, mime_type: file.mime_type, content: '', content_length: 0 });
+          res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+            file_size: file.file_size, mime_type: file.mime_type, content: data, content_length: data.length });
+        });
+      }
+    } else {
+      res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
+        file_size: file.file_size, mime_type: file.mime_type,
+        content: file.content || '', content_length: file.content_length });
+    }
+  });
+});
+
+// 保存文本文件
+app.post('/api/cloud/file/save', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  const content = req.body.content || '';
+  if (!checkFileRateLimit(uid)) return res.status(429).json({ error: '操作太频繁，请1分钟后再试' });
+  if (content.length > 50000) return res.status(400).json({ error: '单个文本文件最大50000字符' });
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (file.file_path) {
+      const filePath = path.join(__dirname, 'public', file.file_path);
+      if (file.enc_key || file.enc_salt) {
+        try {
+          const encKey = getFileEncKey(req, file);
+          if (!encKey) return res.status(500).json({ error: '密钥未就绪' });
+          const tmpPath = filePath + '.tmp';
+          const iv = crypto.randomBytes(12);
+          const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
+          const hdr = Buffer.alloc(40);
+          hdr.write(ENC_MAGIC, 0, 8, 'utf8');
+          hdr.writeUInt16BE(ENC_VERSION, 8);
+          hdr.writeUInt8(12, 10);
+          hdr.writeUInt8(16, 11);
+          iv.copy(hdr, 12);
+          const encBuf = Buffer.concat([hdr, cipher.update(content, 'utf-8'), cipher.final()]);
+          const tag = cipher.getAuthTag();
+          tag.copy(encBuf, 24);
+          fs.writeFileSync(tmpPath, encBuf);
+          fs.renameSync(tmpPath, filePath);
+          logOper(uid, 2, id, 'save', '保存文件');
+          res.json({ ok: true, content_length: content.length });
+        } catch (e) {
+          res.status(500).json({ error: '加密保存失败' });
+        }
+      } else {
+        fs.writeFile(filePath, content, 'utf-8', (err) => {
+          if (err) return res.status(500).json({ error: '保存失败' });
+          logOper(uid, 2, id, 'save', '保存文件');
+          res.json({ ok: true, content_length: content.length });
+        });
+      }
+    } else {
+    ensureStorageConfig(uid, (err, cfg) => {
+      db.get('SELECT COALESCE(SUM(file_size),0)+COALESCE(SUM(content_length),0) as used FROM user_file WHERE user_id = ?', [uid], (err, r) => {
+        const newUsed = r.used - file.content_length + content.length;
+        if (newUsed > cfg.total_quota) return res.status(400).json({ error: '存储空间不足' });
+        db.run('UPDATE user_file SET content=?, content_length=?, update_time=CURRENT_TIMESTAMP WHERE id=? AND user_id=?',
+          [content, content.length, id, uid], function(err) {
+          if (err) return res.status(500).json({ error: '保存失败' });
+          logOper(uid, 2, id, 'save', '保存文件');
+          res.json({ ok: true, content_length: content.length });
+        });
+      });
+    });
+    }
+  });
+});
+
+// 重命名文件
+app.post('/api/cloud/file/rename', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  const newName = (req.body.new_name || '').trim();
+  if (!id || !validateFileName(newName)) return res.status(400).json({ error: '文件名不合法' });
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    db.run('UPDATE user_file SET file_name = ? WHERE id = ? AND user_id = ?', [newName, id, uid], function(err) {
+      if (err) return res.status(400).json({ error: '重命名失败，可能同名已存在' });
+      logOper(uid, 2, id, 'rename', file.file_name + ' → ' + newName);
+      res.json({ ok: true });
+    });
+  });
+});
+
+// 移动文件
+app.post('/api/cloud/file/move', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  const newDir = req.body.new_dir_id ? parseInt(req.body.new_dir_id) : null;
+  if (!id) return res.status(400).json({ error: '参数错误' });
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    db.run('UPDATE user_file SET dir_id = ? WHERE id = ? AND user_id = ?', [newDir, id, uid], function(err) {
+      if (err) return res.status(400).json({ error: '移动失败，可能同名已存在' });
+      logOper(uid, 2, id, 'move', '移动到 ' + (newDir || '根目录'));
+      res.json({ ok: true });
+    });
+  });
+});
+
+// 删除文件
+app.post('/api/cloud/file/delete', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.body.id);
+  if (!id) return res.status(400).json({ error: '参数错误' });
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (file.file_path) fs.unlink(path.join('public', file.file_path), () => {});
+    db.run('DELETE FROM user_file WHERE id = ? AND user_id = ?', [id, uid], function(err) {
+      if (err) return res.status(500).json({ error: '删除失败' });
+      logOper(uid, 2, id, 'delete', '删除文件: ' + file.file_name);
+      res.json({ ok: true });
+    });
+  });
+});
+
+// 下载文件（解密后发送）
+app.get('/api/cloud/file/download/:id', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.params.id);
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (!file.file_path) return res.status(400).json({ error: '该文件无物理存储' });
+    const filePath = path.join(__dirname, 'public', file.file_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
+    res.setHeader('Content-Disposition', 'attachment; filename*=UTF-8\'\'' + encodeURIComponent(file.file_name));
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    if (file.enc_key || file.enc_salt) {
+      if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+      const encKey = getFileEncKey(req, file);
+      if (!encKey) return res.status(500).json({ error: '密钥未就绪，请重新登录' });
+      decryptToStream(filePath, encKey, res).catch(() => {
+        if (!res.headersSent) res.status(500).json({ error: '解密失败' });
+      });
+    } else {
+      fs.createReadStream(filePath).pipe(res);
+    }
+  });
+});
+
+// 流媒体播放（支持 Range 进度条拖动）
+app.get('/api/cloud/file/stream/:id', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const id = parseInt(req.params.id);
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (err) return res.status(500).json({ error: '数据库错误' });
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (!file.file_path) return res.status(400).json({ error: '该文件无物理存储' });
+    const filePath = path.join(__dirname, 'public', file.file_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
+    const mime = file.mime_type || 'application/octet-stream';
+    if (file.enc_key || file.enc_salt) {
+      if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+      const encKey = getFileEncKey(req, file);
+      if (!encKey) return res.status(500).json({ error: '密钥未就绪' });
+      decryptToBuffer(filePath, encKey).then(decrypted => {
+        const total = decrypted.length;
+        const range = req.headers.range;
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? Math.min(parseInt(parts[1], 10), total - 1) : total - 1;
+          if (start >= total) { res.status(416).set('Content-Range', 'bytes */' + total).end(); return; }
+          res.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Content-Type': mime });
+          res.end(decrypted.slice(start, end + 1));
+        } else {
+          res.writeHead(200, { 'Content-Length': total, 'Content-Type': mime, 'Accept-Ranges': 'bytes' });
+          res.end(decrypted);
+        }
+      }).catch(e => { if (!res.headersSent) res.status(500).json({ error: '解密失败' }); });
+    } else {
+      const stat = fs.statSync(filePath);
+      const total = stat.size;
+      const range = req.headers.range;
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? Math.min(parseInt(parts[1], 10), total - 1) : total - 1;
+        if (start >= total) { res.status(416).set('Content-Range', 'bytes */' + total).end(); return; }
+        res.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Content-Type': mime });
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Length': total, 'Content-Type': mime, 'Accept-Ranges': 'bytes' });
+        fs.createReadStream(filePath).pipe(res);
+      }
+    }
+  });
+});
+
+// PDF 预览（方案 B: URL 携带 CSRF Token，不解除 CSRF 拦截）
+app.get('/api/cloud/file/preview/pdf/:id', (req, res) => {
+  const token = req.query._csrf || req.query.token;
+  if (!token || token !== req.csrfToken()) return res.status(403).json({ error: 'CSRF 校验失败' });
+  if (!req.session.user) return res.status(401).json({ error: '请先登录' });
+  const uid = req.session.user.id;
+  const id = parseInt(req.params.id);
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [id, uid], (err, file) => {
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (!file.file_path) return res.status(400).json({ error: '无物理存储' });
+    const filePath = path.join(__dirname, 'public', file.file_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已删除' });
+    if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+    const encKey = getFileEncKey(req, file);
+    if (!encKey) return res.status(500).json({ error: '密钥未就绪，请重新登录' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(file.file_name) + '"');
+    decryptToStream(filePath, encKey, res).catch(e => {
+      if (!res.headersSent) res.status(500).json({ error: '解密失败: ' + e.message });
+    });
+  });
+});
+
+// 扩容礼包
+const EXPAND_PACKAGES = [
+  { id: 1, name: '迷你礼包', quota: 5*1024*1024, cost: 100, bonusCoin: 50, bonusFiles: 0, bonusFolders: 0, desc: '适合轻度用户' },
+  { id: 2, name: '标准礼包', quota: 50*1024*1024, cost: 500, bonusCoin: 300, bonusFiles: 5, bonusFolders: 0, desc: '性价比之选' },
+  { id: 3, name: '豪华礼包', quota: 500*1024*1024, cost: 2000, bonusCoin: 1500, bonusFiles: 10, bonusFolders: 3, desc: '大容量超值' },
+  { id: 4, name: '旗舰礼包', quota: 1024*1024*1024, cost: 5000, bonusCoin: 4000, bonusFiles: 20, bonusFolders: 5, desc: '顶级享受' },
+];
+app.get('/api/cloud/storage/packages', isAuth, (req, res) => {
+  res.json({ packages: EXPAND_PACKAGES });
+});
+app.post('/api/cloud/storage/package', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const pkgId = parseInt(req.body.package_id);
+  const pkg = EXPAND_PACKAGES.find(p => p.id === pkgId);
+  if (!pkg) return res.status(400).json({ error: '无效的礼包' });
+  db.get('SELECT balance FROM users WHERE id = ?', [uid], (err, user) => {
+    if (err || !user) return res.status(500).json({ error: '查询用户失败' });
+    if (user.balance < pkg.cost) return res.status(400).json({ error: '虚拟币不足，需要' + pkg.cost + '，当前余额: ' + user.balance });
+    ensureStorageConfig(uid, (err, cfg) => {
+      if (err) return res.status(500).json({ error: '获取配置失败' });
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        const nb = user.balance - pkg.cost + pkg.bonusCoin;
+        db.run('UPDATE users SET balance = ? WHERE id = ?', [nb, uid], (err) => { if (err) db.run('ROLLBACK'); });
+        db.run('UPDATE user_storage_config SET total_quota=total_quota+?, buy_times=buy_times+1, update_time=CURRENT_TIMESTAMP WHERE user_id=?', [pkg.quota, uid], (err) => { if (err) db.run('ROLLBACK'); });
+        db.run('INSERT INTO user_storage_buy_log (user_id, cost_coin, add_quota) VALUES (?,?,?)', [uid, pkg.cost, pkg.quota], (err) => { if (err) db.run('ROLLBACK'); });
+        db.run('COMMIT', (err) => {
+          if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: '购买失败' }); }
+          req.session.user.balance = nb;
+          res.json({ ok: true, pkg: pkg.name, newQuota: cfg.total_quota + pkg.quota, newBalance: nb, bonusCoin: pkg.bonusCoin, bonusFiles: pkg.bonusFiles, bonusFolders: pkg.bonusFolders });
+        });
+      });
+    });
+  });
+});
+
+// ========== 文件夹自动同步 ==========
+const OLD_MAGIC = Buffer.from('CLOUDENC');
+
+function syncUserFolder(uid, callback) {
+  const dir = path.join(__dirname, 'public', 'uploads', 'cloud', String(uid));
+  if (!fs.existsSync(dir)) return callback(null, { scanned: 0, fixed: 0, migrated: 0 });
+  fs.readdir(dir, (err, files) => {
+    if (err || !files.length) return callback(null, { scanned: 0, fixed: 0, migrated: 0 });
+    let scanned = 0, fixed = 0, migrated = 0, pending = 0;
+    files.forEach(fname => {
+      const fpath = path.join(dir, fname);
+      let stats;
+      try { stats = fs.statSync(fpath); } catch(e) { return; }
+      if (!stats.isFile()) return;
+      scanned++;
+      const fd = fs.openSync(fpath, 'r');
+      const hdr = Buffer.alloc(40);
+      fs.readSync(fd, hdr, 0, 40, 0);
+      fs.closeSync(fd);
+      const relPath = 'uploads/cloud/' + uid + '/' + fname;
+      const hdrStr = hdr.toString('utf8', 0, 8);
+
+      if (hdrStr === 'CLOUDENV2') {
+        const hdrInfo = parseEncFileHeader(fpath);
+        const realSize = hdrInfo && hdrInfo.valid ? stats.size - hdrInfo.cipherStart : stats.size - 40;
+        pending++;
+        db.get('SELECT id, file_size FROM user_file WHERE user_id = ? AND file_path = ?', [uid, relPath], (er, dbF) => {
+          if (dbF && (dbF.file_size === 0 || dbF.file_size !== realSize)) {
+            db.run('UPDATE user_file SET file_size = ? WHERE id = ?', [realSize, dbF.id], () => { pending--; fixed++; maybeDone(); });
+          } else { pending--; maybeDone(); }
+        });
+        return;
+      }
+
+      if (hdrStr === 'CLOUDENC') {
+        pending++;
+        db.get('SELECT id, enc_key, enc_iv, file_size FROM user_file WHERE user_id = ? AND file_path = ?', [uid, relPath], (er, dbF) => {
+          if (!dbF || !dbF.enc_key) { pending--; maybeDone(); return; }
+          try {
+            const oldKey = Buffer.from(dbF.enc_key, 'hex');
+            const oldIv = Buffer.from(dbF.enc_iv, 'hex');
+            const decipher = crypto.createDecipheriv('aes-256-cbc', oldKey, oldIv);
+            const chunks = [];
+            const input = fs.createReadStream(fpath, { start: 8 });
+            input.pipe(decipher);
+            decipher.on('data', chunk => chunks.push(chunk));
+            decipher.on('end', () => {
+              const plain = Buffer.concat(chunks);
+              const newIv = crypto.randomBytes(12);
+              const cipher = crypto.createCipheriv('aes-256-gcm', oldKey, newIv);
+              const tmpPath = fpath + '.mig';
+              const out = fs.createWriteStream(tmpPath);
+              const newHdr = Buffer.alloc(40);
+              newHdr.write('CLOUDENV2', 0, 8, 'utf8');
+              newHdr.writeUInt16BE(ENC_VERSION, 8);
+              newHdr.writeUInt8(12, 10);
+              newHdr.writeUInt8(16, 11);
+              newIv.copy(newHdr, 12);
+              out.write(newHdr);
+              cipher.pipe(out);
+              cipher.write(plain);
+              cipher.end();
+              cipher.on('final', () => {
+                const tag = cipher.getAuthTag();
+                tag.copy(newHdr, 24);
+                const fd2 = fs.openSync(tmpPath, 'r+');
+                fs.writeSync(fd2, newHdr, 24, 16, 24);
+                fs.closeSync(fd2);
+                out.end();
+              });
+              out.on('finish', () => {
+                fs.unlink(fpath, () => {});
+                fs.rename(tmpPath, fpath, () => {
+                  const encSalt = xorEncrypt(oldKey, SERVER_ENC_SECRET).toString('hex');
+                  db.run('UPDATE user_file SET enc_salt = ?, enc_iterations = 0, enc_key = \"\", enc_iv = \"\", file_size = ? WHERE id = ?', [encSalt, plain.length, dbF.id], () => { pending--; migrated++; maybeDone(); });
+                });
+              });
+              out.on('error', () => { try { fs.unlinkSync(tmpPath); } catch(e) {} pending--; maybeDone(); });
+            });
+            decipher.on('error', () => { pending--; maybeDone(); });
+            input.on('error', () => { pending--; maybeDone(); });
+          } catch(e) { pending--; maybeDone(); }
+        });
+        return;
+      }
+
+      pending++;
+      db.get('SELECT enc_key, enc_iv FROM user_file WHERE user_id = ? AND file_path = ?', [uid, relPath], (err2, dbFile) => {
+        if (dbFile && dbFile.enc_key) {
+          const tmp = fpath + '.hdr';
+          const w = fs.createWriteStream(tmp);
+          w.write(OLD_MAGIC);
+          fs.createReadStream(fpath).pipe(w);
+          w.on('finish', () => { fs.unlink(fpath, () => {}); fs.rename(tmp, fpath, () => { pending--; fixed++; maybeDone(); }); });
+          w.on('error', () => { pending--; maybeDone(); });
+        } else {
+          const key = crypto.randomBytes(32);
+          const iv = crypto.randomBytes(12);
+          const tmp = fpath + '.enc';
+          const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+          const out = fs.createWriteStream(tmp);
+          const newHdr = Buffer.alloc(40);
+          newHdr.write('CLOUDENV2', 0, 8, 'utf8');
+          newHdr.writeUInt16BE(ENC_VERSION, 8);
+          newHdr.writeUInt8(12, 10);
+          newHdr.writeUInt8(16, 11);
+          iv.copy(newHdr, 12);
+          out.write(newHdr);
+          fs.createReadStream(fpath).pipe(cipher).pipe(out);
+          cipher.on('final', () => {
+            const tag = cipher.getAuthTag();
+            tag.copy(newHdr, 24);
+            const fd2 = fs.openSync(tmp, 'r+');
+            fs.writeSync(fd2, newHdr, 24, 16, 24);
+            fs.closeSync(fd2);
+          });
+          out.on('finish', () => {
+            fs.unlink(fpath, () => {});
+            fs.rename(tmp, fpath, () => {
+              pending--; fixed++;
+              const ext = path.extname(fname).toLowerCase();
+              const mime = { '.mp4':'video/mp4','.mp3':'audio/mpeg','.jpg':'image/jpeg','.png':'image/png','.gif':'image/gif','.pdf':'application/pdf','.zip':'application/zip','.txt':'text/plain','.html':'text/html','.js':'text/javascript','.json':'application/json' }[ext] || 'application/octet-stream';
+              const encSalt = xorEncrypt(key, SERVER_ENC_SECRET).toString('hex');
+              db.run('INSERT OR IGNORE INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_salt, enc_iterations) VALUES (?,NULL,?,?,?,?,0,?,?)',
+                [uid, fname, relPath, stats.size - 40, mime, encSalt, 0]);
+              maybeDone();
+            });
+          });
+          out.on('error', () => { try { fs.unlinkSync(tmp); } catch(e) {} pending--; maybeDone(); });
+        }
+      });
+    });
+    function maybeDone() { if (pending <= 0) callback(null, { scanned, fixed, migrated }); }
+    if (pending === 0) callback(null, { scanned, fixed, migrated });
+  });
+}
+
+app.post('/api/cloud/sync', isAuth, (req, res) => {
+  syncUserFolder(req.session.user.id, (err, r) => {
+    if (err) return res.status(500).json({ error: '同步失败' });
+    res.json({ ok: true, ...r });
+  });
+});
+
+setInterval(() => {
+  db.all('SELECT DISTINCT user_id FROM user_file', (err, users) => {
+    if (err || !users) return;
+    users.forEach(u => syncUserFolder(u.user_id, () => {}));
+  });
+}, 60000);
+
+// ========== 文件分享 ==========
+
+// 创建分享链接
+app.post('/api/cloud/share/create', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const { file_id, expire_hours, code, max_downloads } = req.body;
+  if (!file_id) return res.status(400).json({ error: '缺少文件ID' });
+  db.get('SELECT * FROM user_file WHERE id = ? AND user_id = ?', [file_id, uid], (err, file) => {
+    if (err || !file) return res.status(404).json({ error: '文件不存在' });
+    const token = require('uuid').v4().replace(/-/g, '').substring(0, 16);
+    const expireTime = expire_hours > 0 ? new Date(Date.now() + expire_hours * 3600000).toISOString() : null;
+    const shareCode = (code || '').trim();
+    const maxDl = Math.max(0, parseInt(max_downloads) || 0);
+    db.run('INSERT INTO file_share (user_id, file_id, token, code, expire_time, max_downloads) VALUES (?,?,?,?,?,?)',
+      [uid, file_id, token, shareCode, expireTime, maxDl], function(err2) {
+        if (err2) return res.status(500).json({ error: '创建分享失败' });
+        res.json({ ok: true, token, code: shareCode, file_name: file.file_name });
+      });
+  });
+});
+
+// 我的分享列表
+app.get('/api/cloud/share/list', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  db.all(`SELECT s.*, f.file_name FROM file_share s LEFT JOIN user_file f ON s.file_id = f.id WHERE s.user_id = ? ORDER BY s.create_time DESC`, [uid], (err, rows) => {
+    if (err) return res.status(500).json({ error: '查询失败' });
+    res.json(rows || []);
+  });
+});
+
+// 删除分享
+app.post('/api/cloud/share/delete', isAuth, (req, res) => {
+  const uid = req.session.user.id;
+  const { id } = req.body;
+  db.run('DELETE FROM file_share WHERE id = ? AND user_id = ?', [id, uid], function(err) {
+    if (err) return res.status(500).json({ error: '删除失败' });
+    res.json({ ok: true });
+  });
+});
+
+// 公开分享页面（无需登录）
+app.get('/share/:token', (req, res) => {
+  const { token } = req.params;
+  db.get('SELECT s.*, f.file_name, f.file_size, f.mime_type FROM file_share s LEFT JOIN user_file f ON s.file_id = f.id WHERE s.token = ?', [token], (err, share) => {
+    if (err || !share) return res.status(404).send('分享不存在或已删除');
+    if (share.expire_time && new Date(share.expire_time) < new Date()) return res.status(410).send('分享已过期');
+    if (share.max_downloads > 0 && share.download_count >= share.max_downloads) return res.status(410).send('下载次数已用完');
+    res.render('share', { share, layout: false });
+  });
+});
+
+// 验证提取码
+app.post('/api/share/:token/verify', (req, res) => {
+  const { token } = req.params;
+  const { code } = req.body;
+  db.get('SELECT * FROM file_share WHERE token = ?', [token], (err, share) => {
+    if (err || !share) return res.json({ ok: false, error: '分享不存在' });
+    if (share.expire_time && new Date(share.expire_time) < new Date()) return res.json({ ok: false, error: '分享已过期' });
+    if (share.max_downloads > 0 && share.download_count >= share.max_downloads) return res.json({ ok: false, error: '下载次数已用完' });
+    if (share.code && share.code !== (code || '').trim()) return res.json({ ok: false, error: '提取码错误' });
+    res.json({ ok: true });
+  });
+});
+
+// 下载分享文件
+app.get('/api/share/:token/download', (req, res) => {
+  const { token } = req.params;
+  const { code } = req.query;
+  db.get('SELECT s.*, f.file_name, f.file_path, f.mime_type, f.enc_key, f.enc_iv FROM file_share s LEFT JOIN user_file f ON s.file_id = f.id WHERE s.token = ?', [token], (err, share) => {
+    if (err || !share) return res.status(404).json({ error: '分享不存在' });
+    if (share.expire_time && new Date(share.expire_time) < new Date()) return res.status(410).json({ error: '分享已过期' });
+    if (share.max_downloads > 0 && share.download_count >= share.max_downloads) return res.status(410).json({ error: '下载次数已用完' });
+    if (share.code && share.code !== (code || '').trim()) return res.status(403).json({ error: '提取码错误' });
+    if (!share.file_path) return res.status(400).json({ error: '文件无物理存储' });
+    const filePath = path.join(__dirname, 'public', share.file_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
+    db.run('UPDATE file_share SET download_count = download_count + 1 WHERE id = ?', [share.id]);
+    res.setHeader('Content-Disposition', 'attachment; filename*=UTF-8\'\'' + encodeURIComponent(share.file_name));
+    res.setHeader('Content-Type', share.mime_type || 'application/octet-stream');
+    if (share.enc_key) {
+      decryptToStream(filePath, share.enc_key, share.enc_iv, res).catch(() => {
+        if (!res.headersSent) res.status(500).json({ error: '解密失败' });
+      });
+    } else {
+      fs.createReadStream(filePath).pipe(res);
+    }
+  });
+});
+
+// ========== Socket.IO ==========
   function broadcastOnlineCount() {
     const uniqueIds = new Set();
     let guestCount = 0;
@@ -1580,7 +2627,7 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
       if (!fromUser) return;
       const msg = sanitize(message).substring(0, 500);
       if (!msg) return;
-      db.run('INSERT INTO private_messages (from_user, to_user, message, time) VALUES (?, ?, ?, ?)', [fromUser.id, to, msg, new Date().toLocaleTimeString()], (err) => {
+      db.run('INSERT INTO private_messages (from_user, to_user, message, time, is_read) VALUES (?, ?, ?, ?, 0)', [fromUser.id, to, msg, new Date().toLocaleTimeString()], (err) => {
         if (err) {
           console.error('保存私信失败:', err);
           socket.emit('error', '发送消息失败，请重试');
@@ -1588,10 +2635,82 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
         }
         for (let [sid, user] of onlineUsers) {
           if (user.id == to) {
-            io.to(sid).emit('privateMsg', { from: fromUser.username, message: msg, time: new Date().toLocaleTimeString() });
+            io.to(sid).emit('privateMsg', { from: fromUser.username, fromId: fromUser.id, message: msg, time: new Date().toLocaleTimeString() });
             break;
           }
         }
+        // 通知接收者有新私信
+        for (let [sid, user] of onlineUsers) {
+          if (user.id == to) {
+            db.get('SELECT COUNT(*) as cnt FROM private_messages WHERE to_user = ? AND is_read = 0', [to], (e, r) => {
+              io.to(sid).emit('unreadUpdate', { privateUnread: r ? r.cnt : 0 });
+            });
+            break;
+          }
+        }
+      });
+    });
+
+    socket.on('joinGroup', (groupId) => {
+      socket.join('group_' + groupId);
+    });
+
+    socket.on('groupMsg', (data) => {
+      const { groupId, message } = data;
+      const fromUser = onlineUsers.get(socket.id);
+      if (!fromUser) return;
+      const msg = sanitize(message).substring(0, 500);
+      if (!msg) return;
+      const now = new Date().toLocaleTimeString();
+      db.run('INSERT INTO group_messages (group_id, from_user, message, time) VALUES (?, ?, ?, ?)', [groupId, fromUser.id, msg, now], function(err) {
+        if (err) return;
+        const msgId = this.lastID;
+        io.to('group_' + groupId).emit('newGroupMsg', {
+          id: msgId, groupId: parseInt(groupId), from: fromUser.username, fromId: fromUser.id, message: msg, time: now
+        });
+        // 通知群成员有未读消息（排除发送者）
+        db.all('SELECT user_id FROM group_members WHERE group_id = ? AND user_id != ?', [groupId, fromUser.id], (err, members) => {
+          if (err) return;
+          members.forEach(m => {
+            for (let [sid, user] of onlineUsers) {
+              if (user.id == m.user_id) {
+                db.get('SELECT COUNT(*) as cnt FROM group_messages gm WHERE gm.group_id = ? AND gm.id > COALESCE((SELECT last_read_id FROM group_members WHERE group_id = ? AND user_id = ?), 0)', [groupId, groupId, m.user_id], (e, r) => {
+                  io.to(sid).emit('groupUnread', { groupId: parseInt(groupId), unread: r ? r.cnt : 0 });
+                });
+                break;
+              }
+            }
+          });
+        });
+      });
+    });
+
+    socket.on('markRead', (data) => {
+      const { groupId } = data;
+      const user = onlineUsers.get(socket.id);
+      if (!user) return;
+      db.run('UPDATE group_members SET last_read_id = (SELECT COALESCE(MAX(id), 0) FROM group_messages WHERE group_id = ?) WHERE group_id = ? AND user_id = ?', [groupId, groupId, user.id]);
+      socket.emit('groupUnread', { groupId: parseInt(groupId), unread: 0 });
+    });
+
+    socket.on('markPrivateRead', (data) => {
+      const { fromId } = data;
+      const user = onlineUsers.get(socket.id);
+      if (!user) return;
+      db.run('UPDATE private_messages SET is_read = 1 WHERE to_user = ? AND from_user = ? AND is_read = 0', [user.id, fromId]);
+      db.get('SELECT COUNT(*) as cnt FROM private_messages WHERE to_user = ? AND is_read = 0', [user.id], (e, r) => {
+        socket.emit('unreadUpdate', { privateUnread: r ? r.cnt : 0 });
+      });
+    });
+
+    socket.on('getUnread', () => {
+      const user = onlineUsers.get(socket.id);
+      if (!user) return;
+      db.get('SELECT COUNT(*) as cnt FROM private_messages WHERE to_user = ? AND is_read = 0', [user.id], (e, r) => {
+        const privateUnread = r ? r.cnt : 0;
+        db.all('SELECT g.id, (SELECT COUNT(*) FROM group_messages gm WHERE gm.group_id = g.id AND gm.id > COALESCE(gm2.last_read_id, 0)) as unread FROM groups g JOIN group_members gm2 ON g.id = gm2.group_id WHERE gm2.user_id = ?', [user.id], (e2, rows) => {
+          socket.emit('unreadUpdate', { privateUnread, groups: rows || [] });
+        });
       });
     });
 

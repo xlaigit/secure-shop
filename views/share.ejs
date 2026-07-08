@@ -1,0 +1,94 @@
+d:\肖宇帆\HTML项目\views\share.ejs
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>📎 文件分享</title>
+  <style>
+    :root{--bg:#0a0e17;--panel:#111827;--text:#f1f5f9;--muted:#64748b;--accent:#3b82f6;--accent2:#10b981;--border:rgba(255,255,255,0.08);--red:#ef4444}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:40px;max-width:420px;width:100%;text-align:center}
+    .icon{font-size:64px;margin-bottom:16px}
+    .title{font-size:20px;font-weight:700;margin-bottom:8px;word-break:break-all}
+    .meta{font-size:13px;color:var(--muted);margin-bottom:24px}
+    .field{text-align:left;margin-bottom:16px}
+    .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    .field input{width:100%;padding:10px 14px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;text-align:center;letter-spacing:4px}
+    .field input:focus{border-color:var(--accent)}
+    .btn{padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#fff;transition:all .15s;width:100%}
+    .btn:hover{filter:brightness(1.15)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
+    .btn.primary{background:linear-gradient(135deg,var(--accent),#2563eb)}
+    .btn.green{background:linear-gradient(135deg,var(--accent2),#059669);margin-top:8px}
+    .error{color:var(--red);font-size:12px;margin-top:8px;min-height:18px}
+    .locked{display:block}
+    .unlocked{display:none}
+    .expire-warn{font-size:12px;color:#f59e0b;margin-top:12px}
+    .dl-info{font-size:12px;color:var(--muted);margin-top:8px}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">📎</div>
+  <div class="title"><%= share.file_name %></div>
+  <div class="meta">
+    <% if (share.file_size) { %><%= (share.file_size / 1024 / 1024).toFixed(2) %> MB · <% } %>
+    <% if (share.mime_type) { %><%= share.mime_type %><% } %>
+  </div>
+  <% if (share.expire_time) { %>
+  <div class="expire-warn">⏰ 有效期至 <%= new Date(share.expire_time).toLocaleString() %></div>
+  <% } %>
+  <% if (share.max_downloads > 0) { %>
+  <div class="dl-info">剩余下载次数：<%= share.max_downloads - share.download_count %> / <%= share.max_downloads %></div>
+  <% } %>
+
+  <% if (share.code) { %>
+  <!-- 有提取码 -->
+  <div class="locked" id="lockPanel">
+    <div class="field">
+      <label>🔒 请输入提取码</label>
+      <input id="codeInput" type="text" placeholder="输入提取码" maxlength="16" autocomplete="off">
+    </div>
+    <div class="error" id="errMsg"></div>
+    <button class="btn primary" onclick="verifyCode()">验证提取码</button>
+  </div>
+  <div class="unlocked" id="unlockPanel">
+    <div class="meta" style="color:var(--accent2)">✅ 验证通过</div>
+    <a class="btn green" id="downloadBtn" href="javascript:void(0)">📥 下载文件</a>
+  </div>
+  <% } else { %>
+  <!-- 无提取码，直接下载 -->
+  <a class="btn green" id="downloadBtn" href="javascript:void(0)">📥 下载文件</a>
+  <div class="error" id="errMsg"></div>
+  <% } %>
+</div>
+
+<script>
+var token = '<%- share.token %>';
+var downloadUrl = '/api/share/' + token + '/download';
+
+<% if (share.code) { %>
+function verifyCode() {
+  var code = document.getElementById('codeInput').value.trim();
+  if (!code) { document.getElementById('errMsg').textContent = '请输入提取码'; return; }
+  fetch('/api/share/' + token + '/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        document.getElementById('lockPanel').style.display = 'none';
+        document.getElementById('unlockPanel').style.display = 'block';
+        document.getElementById('downloadBtn').href = downloadUrl + '?code=' + encodeURIComponent(code);
+      } else {
+        document.getElementById('errMsg').textContent = d.error || '验证失败';
+      }
+    })
+    .catch(function() { document.getElementById('errMsg').textContent = '网络错误'; });
+}
+document.getElementById('codeInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyCode(); });
+<% } else { %>
+document.getElementById('downloadBtn').href = downloadUrl;
+<% } %>
+</script>
+</body>
+</html>

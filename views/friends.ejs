@@ -28,8 +28,22 @@
     .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .actions a,.actions button{padding:8px 10px;border:none;border-radius:10px;color:#fff;background:#374151;text-decoration:none;cursor:pointer}
     .actions a.primary{background:linear-gradient(90deg,var(--accent),#2563eb)}
-    .checkbox-row{display:flex;align-items:center;gap:8px}
     .small{font-size:13px}
+
+    /* === 选择模式 === */
+    .friend-select{cursor:default;transition:all .15s}
+    .friend-select.selecting{cursor:pointer}
+    .friend-select.selecting:hover{background:rgba(56,189,248,0.08)}
+    .friend-select.selected{background:rgba(56,189,248,0.15);border-color:rgba(56,189,248,0.35)}
+    .friend-select .check-circle{display:none;width:22px;height:22px;border-radius:50%;border:2px solid #6b7280;flex-shrink:0;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:all .15s;margin-right:10px}
+    .friend-select.selecting .check-circle{display:flex}
+    .friend-select.selected .check-circle{border-color:var(--accent);background:var(--accent)}
+    .friend-select input[type=checkbox]{display:none}
+    .friend-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2563eb);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;overflow:hidden}
+    .friend-avatar img{width:100%;height:100%;object-fit:cover}
+    .select-toolbar{display:none;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);border-radius:12px;margin-bottom:12px}
+    .select-toolbar .info{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text)}
+    .select-toolbar .info .cnt{font-weight:700;color:var(--accent);font-size:16px}
   </style>
 </head>
 <body>
@@ -58,23 +72,38 @@
         </form>
 
         <h3 style="margin-top:20px">🧑‍🤝‍🧑 好友列表</h3>
-        <form method="POST" action="/friend/group">
+        <form method="POST" action="/friend/group" id="groupForm">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <div class="actions" style="margin-bottom:10px">
-            <button class="btn secondary" type="submit">拉群进入聊天</button>
+
+          <div class="select-toolbar" id="selectToolbar">
+            <div class="info">已选择 <span class="cnt" id="selectedCount">0</span> 人</div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn" id="selectAllBtn" style="background:#374151;padding:6px 14px;font-size:13px">全选</button>
+              <button type="submit" class="btn secondary" id="createGroupBtn" disabled style="padding:6px 14px;font-size:13px">创建群聊</button>
+            </div>
           </div>
+
+          <div class="actions" style="margin-bottom:10px">
+            <button type="button" class="btn" id="enterSelectBtn" style="background:linear-gradient(90deg,var(--accent),#2563eb)">☑ 选择好友</button>
+            <button type="button" class="btn" id="exitSelectBtn" style="background:#374151;display:none">✕ 取消选择</button>
+          </div>
+
           <ul class="list">
-            <% friends.forEach(f => { %>
+            <% friends.forEach(function(f){ %>
               <% if (f.status !== 'pending') { %>
-                <li class="item">
+                <li class="item friend-select" data-id="<%= f.friend_id %>">
+                  <div class="check-circle">✓</div>
                   <div class="left">
-                    <input type="checkbox" name="friend_ids[]" value="<%= f.friend_id %>">
+                    <div class="friend-avatar">
+                      <% if (f.avatar && f.avatar.length > 0){ %><img src="<%= f.avatar %>"><% } else { %><%= f.username.charAt(0).toUpperCase() %><% } %>
+                    </div>
+                    <input type="checkbox" name="friend_ids" value="<%= f.friend_id %>">
                     <div>
                       <div><strong><%= f.username %></strong></div>
                       <div class="muted small">已是好友</div>
                     </div>
                   </div>
-                  <div class="actions">
+                  <div class="actions" onclick="event.stopPropagation()">
                     <a class="primary" href="/chat/private/<%= f.friend_id %>">私聊</a>
                     <form method="POST" action="/friend/delete/<%= f.id %>" style="display:inline">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -86,6 +115,91 @@
             <% }) %>
           </ul>
         </form>
+
+        <script>
+        var selecting = false;
+        var selectedIds = [];
+
+        function updateUI() {
+          var toolbar = document.getElementById('selectToolbar');
+          var countEl = document.getElementById('selectedCount');
+          var btn = document.getElementById('createGroupBtn');
+          countEl.textContent = selectedIds.length;
+          toolbar.style.display = selecting ? 'flex' : 'none';
+          if (selecting) btn.disabled = selectedIds.length === 0;
+        }
+
+        function toggleFriend(el) {
+          if (!selecting) return;
+          var id = parseInt(el.getAttribute('data-id'));
+          var cb = el.querySelector('input[type=checkbox]');
+          var idx = selectedIds.indexOf(id);
+          if (idx > -1) {
+            selectedIds.splice(idx, 1);
+            el.classList.remove('selected');
+            cb.checked = false;
+          } else {
+            selectedIds.push(id);
+            el.classList.add('selected');
+            cb.checked = true;
+          }
+          updateUI();
+        }
+
+        // 点击好友卡片
+        document.querySelectorAll('.friend-select').forEach(function(el) {
+          el.addEventListener('click', function(e) {
+            toggleFriend(this);
+          });
+        });
+
+        // 进入选择模式
+        document.getElementById('enterSelectBtn').onclick = function() {
+          selecting = true;
+          selectedIds = [];
+          document.querySelectorAll('.friend-select').forEach(function(el) {
+            el.classList.add('selecting');
+            el.classList.remove('selected');
+            el.querySelector('input[type=checkbox]').checked = false;
+          });
+          this.style.display = 'none';
+          document.getElementById('exitSelectBtn').style.display = 'inline-block';
+          updateUI();
+        };
+
+        // 退出选择模式
+        document.getElementById('exitSelectBtn').onclick = function() {
+          selecting = false;
+          selectedIds = [];
+          document.querySelectorAll('.friend-select').forEach(function(el) {
+            el.classList.remove('selecting', 'selected');
+            el.querySelector('input[type=checkbox]').checked = false;
+          });
+          this.style.display = 'none';
+          document.getElementById('enterSelectBtn').style.display = 'inline-block';
+          document.getElementById('selectToolbar').style.display = 'none';
+        };
+
+        // 全选
+        document.getElementById('selectAllBtn').onclick = function() {
+          var items = document.querySelectorAll('.friend-select');
+          var allSelected = selectedIds.length === items.length;
+          selectedIds = [];
+          items.forEach(function(el) {
+            var id = parseInt(el.getAttribute('data-id'));
+            var cb = el.querySelector('input[type=checkbox]');
+            if (allSelected) {
+              el.classList.remove('selected');
+              cb.checked = false;
+            } else {
+              selectedIds.push(id);
+              el.classList.add('selected');
+              cb.checked = true;
+            }
+          });
+          updateUI();
+        };
+        </script>
       </div>
 
       <div class="panel">
