@@ -1,4 +1,8 @@
-git rm --cached -r sessions git
-git add .gitignore
-git commit -m "优化：忽略会话缓存与本地临时目录，清理仓库无用文件"
-git push origin main
+node_modules/
+sessions/
+data/
+*.db
+public/uploads/cloud/
+public/uploads/*.jpg
+public/uploads/*.gif
+public/uploads/*.png
