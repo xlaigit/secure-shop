@@ -3,7 +3,7 @@ const fs = require('fs');
 
 const ENC_GLOBAL_SALT = Buffer.from('CLOUDDISK_SECURE_SALT_2024', 'utf8');
 const ENC_ALGO = 'aes-256-gcm';
-const ENC_MAGIC = 'CLOUDENV2';
+const ENC_MAGIC = 'CLOUDKEY';
 const ENC_VERSION = 1;
 const PBKDF2_ITERATIONS = 600000;
 const PBKDF2_KEYLEN = 32;
@@ -37,29 +37,27 @@ function encryptFileStream(inputPath, outputPath, aesKey) {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(ENC_ALGO, aesKey, iv);
     const input = fs.createReadStream(inputPath);
-    const output = fs.createWriteStream(outputPath);
-    const hdr = Buffer.alloc(40);
-    hdr.write(ENC_MAGIC, 0, 8, 'utf8');
-    hdr.writeUInt16BE(ENC_VERSION, 8);
-    hdr.writeUInt8(12, 10);
-    hdr.writeUInt8(16, 11);
-    iv.copy(hdr, 12);
-    output.write(hdr);
-    let encSize = 0;
-    cipher.on('data', chunk => { encSize += chunk.length; });
-    input.pipe(cipher).pipe(output);
-    cipher.on('final', () => {
+    const chunks = [];
+    cipher.on('data', chunk => chunks.push(chunk));
+    cipher.on('end', () => {
+      const encData = Buffer.concat(chunks);
       const tag = cipher.getAuthTag();
+      const hdr = Buffer.alloc(40);
+      hdr.write(ENC_MAGIC, 0, 8, 'utf8');
+      hdr.writeUInt16BE(ENC_VERSION, 8);
+      hdr.writeUInt8(12, 10);
+      hdr.writeUInt8(16, 11);
+      iv.copy(hdr, 12);
       tag.copy(hdr, 24);
-      const fd = fs.openSync(outputPath, 'r+');
-      fs.writeSync(fd, hdr, 24, 16, 24);
+      const fd = fs.openSync(outputPath, 'w');
+      fs.writeSync(fd, hdr);
+      fs.writeSync(fd, encData);
       fs.closeSync(fd);
-      resolve({ encSize });
+      resolve({ encSize: encData.length });
     });
-    function cleanup() { try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch(e) {} }
-    output.on('error', err => { cleanup(); reject(err); });
-    input.on('error', err => { cleanup(); reject(err); });
-    cipher.on('error', err => { cleanup(); reject(err); });
+    input.pipe(cipher);
+    input.on('error', err => { try { fs.unlinkSync(outputPath); } catch(e) {} reject(err); });
+    cipher.on('error', err => { try { fs.unlinkSync(outputPath); } catch(e) {} reject(err); });
   });
 }
 

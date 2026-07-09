@@ -820,7 +820,6 @@
     progEl.style.display = 'block';
     progList.innerHTML = '';
     
-    var CHUNK = 5 * 1024 * 1024; // 5MB per chunk
     var files = Array.from(input.files);
     var idx = 0;
     
@@ -833,82 +832,33 @@
         return;
       }
       var file = files[idx];
-      var totalChunks = Math.ceil(file.size / CHUNK);
       var itemId = 'up_' + idx;
-      progList.innerHTML += '<div class="item" id="' + itemId + '"><span>📄 ' + file.name + '</span><span style="font-size:11px;color:var(--muted);margin-left:auto">0/' + totalChunks + '</span><div class="bar"><div class="fill" style="width:0%"></div></div></div>';
+      progList.innerHTML += '<div class="item" id="' + itemId + '"><span>📄 ' + file.name + '</span><span style="font-size:11px;color:var(--muted);margin-left:auto">上传中...</span><div class="bar"><div class="fill" style="width:0%"></div></div></div>';
       
-      if (file.size <= CHUNK) {
-        // 小文件直接用旧版上传
-        var fd = new FormData();
-        fd.append('file', file);
-        if (currentDirId !== null) fd.append('dir_id', currentDirId);
-        if (btn) { btn.disabled = true; btn.textContent = '⏳ 上传中...'; }
-        fetch('/api/cloud/upload', { method: 'POST', body: fd }).then(function(r) {
-          if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
-          return r.json();
-        }).then(function() {
-          updateChunkProgress(itemId, totalChunks, totalChunks);
-          idx++; uploadNext();
-        }).catch(function(e) {
-          updateChunkProgress(itemId, -1, totalChunks);
-          toast(file.name + ' 上传失败: ' + e.message, 'error');
-          idx++; uploadNext();
-        });
-        return;
-      }
-      
-      // 大文件分片上传
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ 分片上传中...'; }
-      fetch('/api/cloud/upload/init', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_name: file.name, file_size: file.size, mime_type: file.type || 'application/octet-stream', total_chunks: totalChunks })
-      }).then(function(r) { return r.json(); }).then(function(init) {
-        if (init.error) throw new Error(init.error);
-        var uploadId = init.upload_id;
-        var uploaded = 0;
-        function sendChunk(ci) {
-          if (ci >= totalChunks) {
-            // 合并
-            updateChunkProgress(itemId, totalChunks, totalChunks);
-            fetch('/api/cloud/upload/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ upload_id: uploadId, dir_id: currentDirId }) })
-              .then(function(r) { return r.json(); }).then(function(d) {
-                if (d.error) { toast('合并失败: ' + d.error, 'error'); updateChunkProgress(itemId, -1, totalChunks); }
-                else { toast(file.name + ' 上传成功', 'success'); updateChunkProgress(itemId, totalChunks, totalChunks); }
-                idx++; uploadNext();
-              }).catch(function(e) { toast('合并失败: ' + e.message, 'error'); idx++; uploadNext(); });
-            return;
-          }
-          var start = ci * CHUNK;
-          var end = Math.min(start + CHUNK, file.size);
-          var blob = file.slice(start, end);
-          var fd2 = new FormData();
-          fd2.append('chunk', blob, 'chunk');
-          fd2.append('upload_id', uploadId);
-          fd2.append('chunk_index', ci);
-          fetch('/api/cloud/upload/chunk', { method: 'POST', body: fd2 }).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.error) throw new Error(d.error);
-            uploaded++;
-            updateChunkProgress(itemId, uploaded, totalChunks);
-            sendChunk(ci + 1);
-          }).catch(function(e) {
-            toast('分片 ' + ci + ' 失败: ' + e.message + '，重试中...', 'error');
-            setTimeout(function() { sendChunk(ci); }, 1000);
-          });
-        }
-        sendChunk(0);
+      var fd = new FormData();
+      fd.append('file', file);
+      if (currentDirId !== null) fd.append('dir_id', currentDirId);
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ 上传中...'; }
+      fetch('/api/cloud/upload', { method: 'POST', body: fd }).then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+        return r.json();
+      }).then(function() {
+        updateProgress(itemId, true);
+        idx++; uploadNext();
       }).catch(function(e) {
-        toast(file.name + ' 初始化失败: ' + e.message, 'error');
+        updateProgress(itemId, false);
+        toast(file.name + ' 上传失败: ' + e.message, 'error');
         idx++; uploadNext();
       });
     }
     
-    function updateChunkProgress(itemId, done, total) {
+    function updateProgress(itemId, success) {
       var el = document.getElementById(itemId);
       if (!el) return;
       var fill = el.querySelector('.fill');
       var span = el.querySelector('span:last-child');
-      if (done < 0) { fill.style.width = '100%'; fill.style.background = 'var(--red)'; if (span) span.textContent = '失败'; }
-      else { fill.style.width = (total > 0 ? (done / total * 100) : 0) + '%'; if (span) span.textContent = done + '/' + total; }
+      if (success) { fill.style.width = '100%'; if (span) span.textContent = '完成'; }
+      else { fill.style.width = '100%'; fill.style.background = 'var(--red)'; if (span) span.textContent = '失败'; }
     }
     
     uploadNext();
@@ -999,7 +949,7 @@
 
   // ========== 刷新 ==========
   document.getElementById('refreshBtn').onclick = function(){ loadList(); };
-  document.getElementById('shareListBtn').onclick = function(){ openShareList(); };
+  fetch('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' } }).then(function(){ loadList(); });document.getElementById('shareListBtn').onclick = function(){ openShareList(); };
 
   // ========== 初始化 ==========
   // 事件委托：双击 → 打开/预览

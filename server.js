@@ -170,7 +170,7 @@ app.use(session({
     ttl: 86400,
     retries: 0
   }),
-  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+  secret: process.env.SESSION_SECRET || 'cloud-disk-fixed-secret-2024',
   resave: false,
   saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: 'strict', secure: false }
@@ -1595,40 +1595,17 @@ app.post('/admin/appeals/:id/reject', isAdmin, (req, res) => {
 
 // 云盘上传 multer（边上传边加密，只写一次盘）
 const cloudUpload = multer({
-  storage: {
-    _handleFile(req, file, cb) {
-      const uid = req.session.user.id;
-      const dir = path.join('public', 'uploads', 'cloud', String(uid));
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join('public', 'uploads', 'cloud', String(req.session.user.id));
       fs.mkdirSync(dir, { recursive: true });
-      const safe = file.originalname.replace(/[\\/:*?"<>|]/g, '_');
-      const fname = Date.now() + '_' + safe;
-      const finalPath = path.join(dir, fname);
-      const encKey = req.session.user && req.session.user.encKey ? Buffer.from(req.session.user.encKey, 'hex') : crypto.randomBytes(32);
-      const iv = crypto.randomBytes(12);
-      const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
-      const out = fs.createWriteStream(finalPath);
-      const hdr = Buffer.alloc(12 + 12 + 16);
-      hdr.write(ENC_MAGIC, 0, 8, 'utf8');
-      hdr.writeUInt16BE(ENC_VERSION, 8);
-      hdr.writeUInt8(12, 10);
-      hdr.writeUInt8(16, 11);
-      iv.copy(hdr, 12);
-      out.write(hdr);
-      let uploaded = 0;
-      file.stream.on('data', chunk => { uploaded += chunk.length; });
-      file.stream.pipe(cipher).pipe(out);
-      cipher.on('final', () => {
-        const tag = cipher.getAuthTag();
-        tag.copy(hdr, 12 + 12);
-        const fd = fs.openSync(finalPath, 'r+');
-        fs.writeSync(fd, hdr, 12 + 12, 16, 12 + 12);
-        fs.closeSync(fd);
-      });
-      out.on('error', cb);
-      out.on('finish', () => cb(null, { destination: dir, filename: fname, path: finalPath, size: uploaded }));
+      cb(null, dir);
     },
-    _removeFile(req, file, cb) { fs.unlink(file.path, cb); }
-  },
+    filename: (req, file, cb) => {
+      const safe = file.originalname.replace(/[\\/:*?"<>|]/g, '_');
+      cb(null, Date.now() + '_' + safe);
+    }
+  }),
   limits: { fileSize: 10 * 1024 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const blocked = ['.exe','.bat','.cmd','.sh','.php','.asp','.aspx','.jsp','.dll','.so','.msi','.scr','.vbs','.ps1','.jar','.war','.com','.pif','.cgi','.pl','.py','.rb','.reg','.hta','.wsf'];
@@ -1691,19 +1668,33 @@ function getSessionKey(req) {
 
 function getFileEncKey(req, file) {
   if (file.enc_key) return Buffer.from(file.enc_key, 'hex');
+  // enc_iterations=0: XOR加密的密钥，直接从数据库恢复
   if (file.enc_iterations === 0 && file.enc_salt) {
     return xorEncrypt(Buffer.from(file.enc_salt, 'hex'), SERVER_ENC_SECRET);
   }
-  return getSessionKey(req);
+  // enc_iterations>0: 旧格式，密钥在session中
+  const sk = getSessionKey(req);
+  if (sk) return sk;
+  // session中没有密钥，尝试用file.enc_salt（用户盐）+密码重新派生
+  // 但密码不在session中，无法恢复，返回null
+  console.log('[getFileEncKey] 密钥不可用: session.encKey缺失, file.enc_iterations=', file.enc_iterations);
+  return null;
 }
 
 function migrateOldFileSync(filePath, file) {
   if (!file.enc_key || !file.enc_iv) return false;
-  const hdr8 = Buffer.alloc(8);
-  const fd = fs.openSync(filePath, 'r');
-  fs.readSync(fd, hdr8, 0, 8, 0);
-  fs.closeSync(fd);
-  if (hdr8.toString('utf8', 0, 8) !== 'CLOUDENC') return false;
+  try { if (fs.existsSync(filePath + '.mig')) fs.unlinkSync(filePath + '.mig'); } catch (e) {}
+  let fd;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const hdr8 = Buffer.alloc(8);
+    fs.readSync(fd, hdr8, 0, 8, 0);
+    fs.closeSync(fd); fd = null;
+    if (hdr8.toString('utf8', 0, 8) !== 'CLOUDENC') return false;
+  } catch (e) {
+    if (fd) try { fs.closeSync(fd); } catch (e2) {}
+    return false;
+  }
   const oldKey = Buffer.from(file.enc_key, 'hex');
   const oldIv = Buffer.from(file.enc_iv, 'hex');
   const encBuf = fs.readFileSync(filePath);
@@ -1712,18 +1703,28 @@ function migrateOldFileSync(filePath, file) {
   const newIv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', oldKey, newIv);
   const newHdr = Buffer.alloc(40);
-  newHdr.write('CLOUDENV2', 0, 8, 'utf8');
+  newHdr.write('CLOUDKEY', 0, 8, 'utf8');
   newHdr.writeUInt16BE(ENC_VERSION, 8);
   newHdr.writeUInt8(12, 10);
   newHdr.writeUInt8(16, 11);
   newIv.copy(newHdr, 12);
-  const newEnc = Buffer.concat([newHdr, cipher.update(plain), cipher.final()]);
+  const encData = cipher.update(plain);
+  const finalData = cipher.final();
   const tag = cipher.getAuthTag();
-  tag.copy(newEnc, 24);
-  const tmpPath = filePath + '.mig';
-  fs.writeFileSync(tmpPath, newEnc);
-  fs.unlinkSync(filePath);
-  fs.renameSync(tmpPath, filePath);
+  tag.copy(newHdr, 24);
+  const tmpPath = filePath + '.tmp' + Date.now();
+  try {
+    const outFd = fs.openSync(tmpPath, 'w');
+    fs.writeSync(outFd, newHdr);
+    fs.writeSync(outFd, encData);
+    if (finalData && finalData.length) fs.writeSync(outFd, finalData);
+    fs.closeSync(outFd);
+    fs.unlinkSync(filePath);
+    fs.renameSync(tmpPath, filePath);
+  } catch (e) {
+    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (e2) {}
+    return false;
+  }
   const encSalt = xorEncrypt(oldKey, SERVER_ENC_SECRET).toString('hex');
   db.run('UPDATE user_file SET enc_salt = ?, enc_iterations = 0, enc_key = \"\", enc_iv = \"\" WHERE id = ?', [encSalt, file.id]);
   file.enc_key = null;
@@ -1903,14 +1904,12 @@ app.post('/api/cloud/upload/merge', isAuth, (req, res) => {
           fs.createReadStream(cp).on('end', () => { idx++; pipeNext(); }).on('error', (e) => { out.destroy(); res.status(500).json({ error: '读取分片失败' }); }).pipe(cipher, { end: false });
         }
         cipher.pipe(out);
-        cipher.on('final', () => {
+        out.on('finish', () => {
           const tag = cipher.getAuthTag();
           tag.copy(hdr, 24);
           const fd = fs.openSync(finalPath, 'r+');
           fs.writeSync(fd, hdr, 24, 16, 24);
           fs.closeSync(fd);
-        });
-        out.on('finish', () => {
           const relPath = 'uploads/cloud/' + uid + '/' + finalName;
           const salt = req.session.user && req.session.user.encSalt || '';
           db.run('INSERT INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_salt, enc_iterations) VALUES (?,?,?,?,?,?,0,?,?)',
@@ -1948,23 +1947,42 @@ app.post('/api/cloud/upload', isAuth, (req, res) => {
       const dirId = req.body.dir_id ? parseInt(req.body.dir_id) : null;
       const originalName = req.file.originalname;
 
-      if (!validateFileName(originalName)) return res.status(400).json({ error: '文件名不合法' });
+      if (!validateFileName(originalName)) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(400).json({ error: '文件名不合法' });
+      }
 
       ensureStorageConfig(uid, (err, cfg) => {
         db.get('SELECT COALESCE(SUM(file_size),0)+COALESCE(SUM(content_length),0) as used FROM user_file WHERE user_id = ?', [uid], (err, r2) => {
-          const realSize = fs.statSync(req.file.path).size - 40;
-          if (r2.used + realSize > cfg.total_quota) {
+          const rawSize = fs.statSync(req.file.path).size;
+          if (r2.used + rawSize > cfg.total_quota) {
             fs.unlink(req.file.path, () => {});
             return res.status(400).json({ error: '存储空间不足，请扩容或清理文件' });
           }
 
-          const relPath = 'uploads/cloud/' + uid + '/' + req.file.filename;
-          const salt = req.session.user && req.session.user.encSalt || '';
-          db.run('INSERT INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_salt, enc_iterations) VALUES (?,?,?,?,?,?,0,?,?)',
-            [uid, dirId, originalName, relPath, realSize, req.file.mimetype, salt, PBKDF2_ITERATIONS], function(err2) {
+          // 加密原文件（流式，无竞态）
+          if (!req.session.user || !req.session.user.encKey) {
+            fs.unlink(req.file.path, () => {});
+            return res.status(500).json({ error: '密钥未就绪，请重新登录后再试' });
+          }
+          const encKey = Buffer.from(req.session.user.encKey, 'hex');
+          console.log('[UPLOAD] encKey hex:', req.session.user.encKey.substring(0, 16) + '...');
+          const encPath = req.file.path + '.enc';
+          encryptFileStream(req.file.path, encPath, encKey).then(({ encSize }) => {
+            try { fs.unlinkSync(req.file.path); } catch (e2) {}
+            fs.renameSync(encPath, req.file.path);
+            const fileSize = fs.statSync(req.file.path).size;
+            const relPath = 'uploads/cloud/' + uid + '/' + req.file.filename;
+            db.run('INSERT INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_key) VALUES (?,?,?,?,?,?,?,?)',
+              [uid, dirId, originalName, relPath, fileSize, req.file.mimetype, rawSize, encKey.toString('hex')], function(err2) {
             if (err2) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: '保存失败，可能同名文件已存在' }); }
             logOper(uid, 2, this.lastID, 'create', '上传文件: ' + originalName);
-            res.json({ id: this.lastID, file_name: originalName, file_size: req.file.size, mime_type: req.file.mimetype });
+            res.json({ id: this.lastID, file_name: originalName, file_size: rawSize, mime_type: req.file.mimetype });
+          });
+          }).catch(e => {
+            try { fs.unlinkSync(req.file.path); } catch (e2) {}
+            try { if (fs.existsSync(encPath)) fs.unlinkSync(encPath); } catch (e2) {}
+            return res.status(500).json({ error: '加密失败: ' + e.message });
           });
         });
       });
@@ -2081,9 +2099,10 @@ app.get('/api/cloud/file/read', isAuth, (req, res) => {
       const filePath = path.join(__dirname, 'public', file.file_path);
       if (!fs.existsSync(filePath)) return res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
         file_size: file.file_size, mime_type: file.mime_type, content: '', content_length: 0 });
-      if (file.enc_key || file.enc_salt) {
+      if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+      const hdr = parseEncFileHeader(filePath);
+      if (hdr && hdr.valid) {
         try {
-          if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
           const encKey = getFileEncKey(req, file);
           if (!encKey) return res.json({ id: file.id, file_name: file.file_name, file_path: file.file_path,
             file_size: file.file_size, mime_type: file.mime_type, content: '', content_length: 0 });
@@ -2121,7 +2140,9 @@ app.post('/api/cloud/file/save', isAuth, (req, res) => {
     if (!file) return res.status(404).json({ error: '文件不存在' });
     if (file.file_path) {
       const filePath = path.join(__dirname, 'public', file.file_path);
-      if (file.enc_key || file.enc_salt) {
+      if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+      const hdr2 = parseEncFileHeader(filePath);
+      if (hdr2 && hdr2.valid) {
         try {
           const encKey = getFileEncKey(req, file);
           if (!encKey) return res.status(500).json({ error: '密钥未就绪' });
@@ -2227,14 +2248,19 @@ app.get('/api/cloud/file/download/:id', isAuth, (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
     res.setHeader('Content-Disposition', 'attachment; filename*=UTF-8\'\'' + encodeURIComponent(file.file_name));
     res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
-    if (file.enc_key || file.enc_salt) {
-      if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+    if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+    const hdr = parseEncFileHeader(filePath);
+    console.log('[DOWNLOAD] 文件:', file.file_name, '| 头检测:', hdr ? (hdr.valid ? '有效加密文件' : '无效:' + hdr.reason) : '无头信息');
+    if (hdr && hdr.valid) {
       const encKey = getFileEncKey(req, file);
-      if (!encKey) return res.status(500).json({ error: '密钥未就绪，请重新登录' });
-      decryptToStream(filePath, encKey, res).catch(() => {
-        if (!res.headersSent) res.status(500).json({ error: '解密失败' });
+      console.log('[DOWNLOAD] encKey:', encKey ? encKey.toString('hex').substring(0, 16) + '...' : 'NULL');
+      if (!encKey) { console.log('[DOWNLOAD] 密钥未就绪'); return res.status(500).json({ error: '密钥未就绪，请重新登录' }); }
+      decryptToStream(filePath, encKey, res).catch(err => {
+        console.log('[DOWNLOAD] 解密失败:', err.message);
+        if (!res.headersSent) res.status(500).json({ error: '解密失败: ' + err.message });
       });
     } else {
+      console.log('[DOWNLOAD] 未加密文件，直接输出');
       fs.createReadStream(filePath).pipe(res);
     }
   });
@@ -2251,25 +2277,18 @@ app.get('/api/cloud/file/stream/:id', isAuth, (req, res) => {
     const filePath = path.join(__dirname, 'public', file.file_path);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
     const mime = file.mime_type || 'application/octet-stream';
-    if (file.enc_key || file.enc_salt) {
-      if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+    if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
+    const hdr = parseEncFileHeader(filePath);
+    console.log('[STREAM] 文件:', file.file_name, '| 头检测:', hdr ? (hdr.valid ? '有效加密文件' : '无效:' + hdr.reason) : '无头信息');
+    if (hdr && hdr.valid) {
       const encKey = getFileEncKey(req, file);
-      if (!encKey) return res.status(500).json({ error: '密钥未就绪' });
-      decryptToBuffer(filePath, encKey).then(decrypted => {
-        const total = decrypted.length;
-        const range = req.headers.range;
-        if (range) {
-          const parts = range.replace(/bytes=/, '').split('-');
-          const start = parseInt(parts[0], 10);
-          const end = parts[1] ? Math.min(parseInt(parts[1], 10), total - 1) : total - 1;
-          if (start >= total) { res.status(416).set('Content-Range', 'bytes */' + total).end(); return; }
-          res.writeHead(206, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Content-Type': mime });
-          res.end(decrypted.slice(start, end + 1));
-        } else {
-          res.writeHead(200, { 'Content-Length': total, 'Content-Type': mime, 'Accept-Ranges': 'bytes' });
-          res.end(decrypted);
-        }
-      }).catch(e => { if (!res.headersSent) res.status(500).json({ error: '解密失败' }); });
+      console.log('[STREAM] encKey:', encKey ? encKey.toString('hex').substring(0, 16) + '...' : 'NULL');
+      if (!encKey) { console.log('[STREAM] 密钥未就绪'); return res.status(500).json({ error: '密钥未就绪' }); }
+      res.setHeader('Content-Type', mime);
+      decryptToStream(filePath, encKey, res).catch(e => {
+        console.log('[STREAM] 解密失败:', e.message);
+        if (!res.headersSent) res.status(500).json({ error: '解密失败' });
+      });
     } else {
       const stat = fs.statSync(filePath);
       const total = stat.size;
@@ -2302,13 +2321,20 @@ app.get('/api/cloud/file/preview/pdf/:id', (req, res) => {
     const filePath = path.join(__dirname, 'public', file.file_path);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已删除' });
     if (file.enc_key && file.enc_iv) migrateOldFileSync(filePath, file);
-    const encKey = getFileEncKey(req, file);
-    if (!encKey) return res.status(500).json({ error: '密钥未就绪，请重新登录' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(file.file_name) + '"');
-    decryptToStream(filePath, encKey, res).catch(e => {
-      if (!res.headersSent) res.status(500).json({ error: '解密失败: ' + e.message });
-    });
+    const hdr = parseEncFileHeader(filePath);
+    if (hdr && hdr.valid) {
+      const encKey = getFileEncKey(req, file);
+      if (!encKey) return res.status(500).json({ error: '密钥未就绪，请重新登录' });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(file.file_name) + '"');
+      decryptToStream(filePath, encKey, res).catch(e => {
+        if (!res.headersSent) res.status(500).json({ error: '解密失败: ' + e.message });
+      });
+    } else {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(file.file_name) + '"');
+      fs.createReadStream(filePath).pipe(res);
+    }
   });
 });
 
@@ -2353,9 +2379,21 @@ const OLD_MAGIC = Buffer.from('CLOUDENC');
 
 function syncUserFolder(uid, callback) {
   const dir = path.join(__dirname, 'public', 'uploads', 'cloud', String(uid));
-  if (!fs.existsSync(dir)) return callback(null, { scanned: 0, fixed: 0, migrated: 0 });
+  function cleanOrphanRecords(s, f, m) {
+    db.all('SELECT id, file_path FROM user_file WHERE user_id = ?', [uid], (er, rows) => {
+      if (!rows || !rows.length) return callback(null, { scanned: s, fixed: f, migrated: m, cleaned: 0 });
+      let pending = rows.length, cleaned = 0;
+      rows.forEach(r => {
+        const fp = path.join(__dirname, 'public', r.file_path);
+        if (!fs.existsSync(fp)) {
+          db.run('DELETE FROM user_file WHERE id = ?', [r.id], () => { cleaned++; if (--pending === 0) callback(null, { scanned: s, fixed: f, migrated: m, cleaned }); });
+        } else { if (--pending === 0) callback(null, { scanned: s, fixed: f, migrated: m, cleaned }); }
+      });
+    });
+  }
+  if (!fs.existsSync(dir)) return cleanOrphanRecords(0, 0, 0);
   fs.readdir(dir, (err, files) => {
-    if (err || !files.length) return callback(null, { scanned: 0, fixed: 0, migrated: 0 });
+    if (err || !files.length) return cleanOrphanRecords(0, 0, 0);
     let scanned = 0, fixed = 0, migrated = 0, pending = 0;
     files.forEach(fname => {
       const fpath = path.join(dir, fname);
@@ -2370,7 +2408,7 @@ function syncUserFolder(uid, callback) {
       const relPath = 'uploads/cloud/' + uid + '/' + fname;
       const hdrStr = hdr.toString('utf8', 0, 8);
 
-      if (hdrStr === 'CLOUDENV2') {
+      if (hdrStr === 'CLOUDKEY') {
         const hdrInfo = parseEncFileHeader(fpath);
         const realSize = hdrInfo && hdrInfo.valid ? stats.size - hdrInfo.cipherStart : stats.size - 40;
         pending++;
@@ -2401,7 +2439,7 @@ function syncUserFolder(uid, callback) {
               const tmpPath = fpath + '.mig';
               const out = fs.createWriteStream(tmpPath);
               const newHdr = Buffer.alloc(40);
-              newHdr.write('CLOUDENV2', 0, 8, 'utf8');
+              newHdr.write('CLOUDKEY', 0, 8, 'utf8');
               newHdr.writeUInt16BE(ENC_VERSION, 8);
               newHdr.writeUInt8(12, 10);
               newHdr.writeUInt8(16, 11);
@@ -2444,44 +2482,12 @@ function syncUserFolder(uid, callback) {
           w.on('finish', () => { fs.unlink(fpath, () => {}); fs.rename(tmp, fpath, () => { pending--; fixed++; maybeDone(); }); });
           w.on('error', () => { pending--; maybeDone(); });
         } else {
-          const key = crypto.randomBytes(32);
-          const iv = crypto.randomBytes(12);
-          const tmp = fpath + '.enc';
-          const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-          const out = fs.createWriteStream(tmp);
-          const newHdr = Buffer.alloc(40);
-          newHdr.write('CLOUDENV2', 0, 8, 'utf8');
-          newHdr.writeUInt16BE(ENC_VERSION, 8);
-          newHdr.writeUInt8(12, 10);
-          newHdr.writeUInt8(16, 11);
-          iv.copy(newHdr, 12);
-          out.write(newHdr);
-          fs.createReadStream(fpath).pipe(cipher).pipe(out);
-          cipher.on('final', () => {
-            const tag = cipher.getAuthTag();
-            tag.copy(newHdr, 24);
-            const fd2 = fs.openSync(tmp, 'r+');
-            fs.writeSync(fd2, newHdr, 24, 16, 24);
-            fs.closeSync(fd2);
-          });
-          out.on('finish', () => {
-            fs.unlink(fpath, () => {});
-            fs.rename(tmp, fpath, () => {
-              pending--; fixed++;
-              const ext = path.extname(fname).toLowerCase();
-              const mime = { '.mp4':'video/mp4','.mp3':'audio/mpeg','.jpg':'image/jpeg','.png':'image/png','.gif':'image/gif','.pdf':'application/pdf','.zip':'application/zip','.txt':'text/plain','.html':'text/html','.js':'text/javascript','.json':'application/json' }[ext] || 'application/octet-stream';
-              const encSalt = xorEncrypt(key, SERVER_ENC_SECRET).toString('hex');
-              db.run('INSERT OR IGNORE INTO user_file (user_id, dir_id, file_name, file_path, file_size, mime_type, content_length, enc_salt, enc_iterations) VALUES (?,NULL,?,?,?,?,0,?,?)',
-                [uid, fname, relPath, stats.size - 40, mime, encSalt, 0]);
-              maybeDone();
-            });
-          });
-          out.on('error', () => { try { fs.unlinkSync(tmp); } catch(e) {} pending--; maybeDone(); });
+          pending--; maybeDone();
         }
       });
     });
-    function maybeDone() { if (pending <= 0) callback(null, { scanned, fixed, migrated }); }
-    if (pending === 0) callback(null, { scanned, fixed, migrated });
+    function maybeDone() { if (pending <= 0) cleanOrphanRecords(scanned, fixed, migrated); }
+    if (pending === 0) cleanOrphanRecords(scanned, fixed, migrated);
   });
 }
 
