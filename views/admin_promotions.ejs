@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>促销管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#f59e0b,#d97706);color:white}
+    .container{max-width:1200px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+    .form-row>div{display:flex;flex-direction:column}
+    .form-row label{font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:500}
+    .form-row input,.form-row select,.form-row textarea{padding:8px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+    .form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:#f59e0b}
+    .form-row textarea{min-width:280px;resize:vertical;min-height:60px}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#f59e0b,#d97706);color:white;box-shadow:0 4px 12px rgba(245,158,11,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(245,158,11,.4)}
+    .btn-edit{background:#eff6ff;color:#2563eb;border:2px solid #bfdbfe}
+    .btn-edit:hover{background:#dbeafe}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    .btn-sm{padding:5px 12px;font-size:12px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px;vertical-align:middle}
+    tr:hover td{background:#fffbeb}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-active{background:#ecfdf5;color:#065f46}
+    .badge-inactive{background:#fef2f2;color:#991b1b}
+    .badge-type{background:#f3f4f6;color:#4b5563}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    .empty .icon{font-size:40px;margin-bottom:10px}
+    .discount-text{color:#f59e0b;font-weight:700;font-size:15px}
+    .schedule-box{border:2px dashed #e5e7eb;border-radius:10px;padding:14px;margin-top:10px;background:#fafafa;display:none}
+    .schedule-box.show{display:block}
+    .day-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .day-grid label{display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 10px;background:white;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer;transition:all .15s}
+    .day-grid label:hover{border-color:#f59e0b;background:#fffbeb}
+    .day-grid input[type="checkbox"]{accent-color:#f59e0b}
+    .schedule-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;margin-top:2px}
+    .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center}
+    .modal-overlay.show{display:flex}
+    .modal{background:white;border-radius:16px;padding:28px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+    .modal h2{font-size:18px;margin-bottom:16px}
+    .modal .form-row{margin-bottom:14px}
+    .modal .form-row>div{flex:1;min-width:140px}
+    .modal .form-row input,.modal .form-row select,.modal .form-row textarea{width:100%}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+    .modal-actions .btn{padding:9px 22px}
+    .product-checkbox-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;padding:8px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa}
+    .product-checkbox-grid label{display:flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;background:white;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer}
+    .product-checkbox-grid label:hover{border-color:#f59e0b}
+    .product-checkbox-grid input[type="checkbox"]{accent-color:#f59e0b}
+    .inline-flex{display:inline-flex;align-items:center;gap:6px}
+    .desc-preview{color:#6b7280;font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    @media(max-width:768px){.form-row{flex-direction:column}.nav{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <span class="brand">🎯 促销管理中心</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/promotions" class="active">🎯 促销</a>
+      <a href="/admin/flash">⚡ 秒杀</a>
+      <a href="/admin/coupons">🎫 优惠券</a>
+      <a href="/admin/products">📦 商品</a>
+      <a href="/admin/orders">📋 订单</a>
+      <a href="/admin/users">👥 用户</a>
+      <a href="/admin/logout">退出</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>🎯 促销活动管理</h1>
+
+    <div class="card">
+      <h2>➕ 创建促销活动</h2>
+      <form method="POST" action="/admin/promotions/create">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-row">
+          <div style="flex:2">
+            <label>促销标题 *</label>
+            <input type="text" name="title" required placeholder="如：🔥 夏季大促">
+          </div>
+          <div>
+            <label>类型</label>
+            <select name="type">
+              <option value="promo">促销 (promo)</option>
+              <option value="event">活动 (event)</option>
+              <option value="free">限免 (free)</option>
+            </select>
+          </div>
+          <div>
+            <label>折扣类型</label>
+            <select name="discount_type">
+              <option value="percent">百分比 (%)</option>
+              <option value="fixed">固定金额 (¥)</option>
+            </select>
+          </div>
+          <div>
+            <label>折扣值</label>
+            <input type="number" name="discount" step="0.1" min="0" max="100" value="10" placeholder="如 30" style="width:80px;">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div style="flex:1;min-width:200px">
+            <label>描述</label>
+            <input type="text" name="description" placeholder="活动描述">
+          </div>
+          <div>
+            <label>排序</label>
+            <input type="number" name="sort_order" value="0" style="width:60px;">
+          </div>
+          <div>
+            <label>开始时间</label>
+            <input type="datetime-local" name="start_time">
+          </div>
+          <div>
+            <label>结束时间</label>
+            <input type="datetime-local" name="end_time">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div style="flex:1">
+            <label>关联商品（可多选，不选则应用于所有商品）</label>
+            <div class="product-checkbox-grid">
+              <% products.forEach(function(p) { %>
+                <label><input type="checkbox" name="product_ids" value="<%= p.id %>"> <%= p.name %> (¥<%= p.price %>)</label>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" type="submit">创建促销活动</button>
+        </div>
+
+        <div style="margin-top:12px;border-top:1px solid #f3f4f6;padding-top:12px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="enable_schedule" onchange="toggleSchedule()" style="accent-color:#f59e0b">
+            🔄 设置为定时自动开启（按周/按月循环）
+          </label>
+        </div>
+
+        <div class="schedule-box" id="schedule_box">
+          <div class="form-row">
+            <div>
+              <label>循环模式</label>
+              <select name="schedule_type" id="schedule_type" onchange="toggleScheduleType()">
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+              </select>
+            </div>
+            <div>
+              <label>持续时长（分钟）</label>
+              <input type="number" name="schedule_duration" id="schedule_duration" value="120" min="10" step="10" style="width:100px;">
+              <div style="font-size:10px;color:#9ca3af;margin-top:2px">从开始时间算起</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label id="day_label">选择每周几开启</label>
+              <div class="day-grid" id="weekly_days">
+                <label><input type="checkbox" class="create-day-cb" value="1"> 周一</label>
+                <label><input type="checkbox" class="create-day-cb" value="2"> 周二</label>
+                <label><input type="checkbox" class="create-day-cb" value="3"> 周三</label>
+                <label><input type="checkbox" class="create-day-cb" value="4"> 周四</label>
+                <label><input type="checkbox" class="create-day-cb" value="5"> 周五</label>
+                <label><input type="checkbox" class="create-day-cb" value="6"> 周六</label>
+                <label><input type="checkbox" class="create-day-cb" value="0"> 周日</label>
+              </div>
+              <div class="day-grid" id="monthly_days" style="display:none">
+                <% for (var d = 1; d <= 31; d++) { %>
+                  <label><input type="checkbox" class="create-day-cb-monthly" value="<%= d %>"> <%= d %>号</label>
+                <% } %>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#6b7280;margin-top:8px;padding:8px;background:#fffbeb;border-radius:8px">
+            💡 提示：开始时间中的日期部分会被忽略，仅使用 <strong>时分</strong> 部分。系统每5分钟自动检查并开启/关闭。
+          </div>
+        </div>
+      </form>
+
+    <div class="card">
+      <h2>📋 促销活动列表</h2>
+      <% if (promotions.length === 0) { %>
+        <div class="empty">
+          <div class="icon">🎯</div>
+          <p>暂无促销活动，点击上方创建吧</p>
+        </div>
+      <% } else { %>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>标题</th>
+            <th>类型</th>
+            <th>折扣</th>
+            <th>描述</th>
+            <th>关联商品</th>
+            <th>时间</th>
+            <th>定时规则</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% promotions.forEach(function(p) { %>
+          <tr>
+            <td><%= p.id %></td>
+            <td><strong><%= p.title %></strong></td>
+            <td><span class="badge badge-type"><%= p.type %></span></td>
+            <td><span class="discount-text">
+              <%= p.discount_type === 'percent' ? p.discount + '% OFF' : '¥' + p.discount %>
+            </span></td>
+            <td><div class="desc-preview" title="<%= p.description %>"><%= p.description || '-' %></div></td>
+            <td><%= p.product_count %> 件</td>
+            <td style="font-size:11px;color:#6b7280">
+              <%= p.start_time ? p.start_time.slice(0,16) : '-' %><br>
+              → <%= p.end_time ? p.end_time.slice(0,16) : '-' %>
+            </td>
+            <td>
+              <% if (p.schedule_type && p.schedule_type !== 'manual') { %>
+                <span class="schedule-tag">
+                  <% if (p.schedule_type === 'weekly') { %>
+                    📅 每周
+                    <% 
+                      var dayNames = {0:'周日',1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六'};
+                      var days = (p.schedule_days || '').split(',').filter(Boolean);
+                      days.forEach(function(d, i) { 
+                    %><%= dayNames[d] || '周' + d %><% if (i < days.length - 1) { %>、<% } %>
+                    <% }); %>
+                    <% if (p.schedule_duration > 0) { %><br>⏱ <%= p.schedule_duration %>分钟<% } %>
+                  <% } else if (p.schedule_type === 'monthly') { %>
+                    📅 每月
+                    <% 
+                      var days = (p.schedule_days || '').split(',').filter(Boolean);
+                      days.forEach(function(d, i) { 
+                    %><%= d %>号<% if (i < days.length - 1) { %>、<% } %>
+                    <% }); %>
+                    <% if (p.schedule_duration > 0) { %><br>⏱ <%= p.schedule_duration %>分钟<% } %>
+                  <% } %>
+                </span>
+              <% } else { %>
+                <span style="color:#9ca3af;font-size:12px">手动</span>
+              <% } %>
+            </td>
+            <td>
+              <span class="badge <%= p.is_active ? 'badge-active' : 'badge-inactive' %>">
+                <%= p.is_active ? '进行中' : '已停用' %>
+              </span>
+            </td>
+            <td>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <button class="btn btn-edit btn-sm" onclick="openEdit(<%= p.id %>)">✏️ 编辑</button>
+                <form method="POST" action="/admin/promotions/<%= p.id %>/toggle" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-sm" style="background:<%= p.is_active ? '#fef3c7' : '#ecfdf5' %>;color:<%= p.is_active ? '#92400e' : '#065f46' %>;border:2px solid <%= p.is_active ? '#fde68a' : '#a7f3d0' %>">
+                    <%= p.is_active ? '⏸ 停用' : '▶️ 启用' %>
+                  </button>
+                </form>
+                <form method="POST" action="/admin/promotions/delete/<%= p.id %>" style="display:inline" onsubmit="return confirm('确定删除该促销活动？')">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-danger btn-sm" type="submit">🗑 删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- 编辑弹窗 -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h2>✏️ 编辑促销活动</h2>
+      <form method="POST" action="" id="editForm">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-row">
+          <div style="flex:2">
+            <label>促销标题 *</label>
+            <input type="text" name="title" id="edit_title" required>
+          </div>
+          <div>
+            <label>类型</label>
+            <select name="type" id="edit_type">
+              <option value="promo">促销 (promo)</option>
+              <option value="event">活动 (event)</option>
+              <option value="free">限免 (free)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>折扣类型</label>
+            <select name="discount_type" id="edit_discount_type">
+              <option value="percent">百分比 (%)</option>
+              <option value="fixed">固定金额 (¥)</option>
+            </select>
+          </div>
+          <div>
+            <label>折扣值</label>
+            <input type="number" name="discount" id="edit_discount" step="0.1" min="0" style="width:80px;">
+          </div>
+          <div>
+            <label>排序</label>
+            <input type="number" name="sort_order" id="edit_sort_order" style="width:60px;">
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>描述</label>
+            <input type="text" name="description" id="edit_description">
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>开始时间</label>
+            <input type="datetime-local" name="start_time" id="edit_start_time">
+          </div>
+          <div>
+            <label>结束时间</label>
+            <input type="datetime-local" name="end_time" id="edit_end_time">
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:8px 0">
+              <input type="checkbox" name="is_active" id="edit_is_active" value="1" checked> 启用
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>关联商品</label>
+            <div class="product-checkbox-grid" id="edit_product_grid">
+              <% products.forEach(function(p) { %>
+                <label><input type="checkbox" name="product_ids" value="<%= p.id %>" class="edit-product-cb"> <%= p.name %> (¥<%= p.price %>)</label>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #f3f4f6;padding-top:12px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="edit_enable_schedule" onchange="toggleEditSchedule()">
+            🔄 定时自动开启
+          </label>
+        </div>
+        <div class="schedule-box" id="edit_schedule_box">
+          <div class="form-row">
+            <div>
+              <label>循环模式</label>
+              <select name="schedule_type" id="edit_schedule_type" onchange="toggleEditScheduleType()">
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+              </select>
+            </div>
+            <div>
+              <label>持续时长（分钟）</label>
+              <input type="number" name="schedule_duration" id="edit_schedule_duration" value="120" min="10" step="10" style="width:100px;">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label id="edit_day_label">选择每周几开启</label>
+              <div class="day-grid" id="edit_weekly_days">
+                <label><input type="checkbox" value="1" class="edit-day-cb"> 周一</label>
+                <label><input type="checkbox" value="2" class="edit-day-cb"> 周二</label>
+                <label><input type="checkbox" value="3" class="edit-day-cb"> 周三</label>
+                <label><input type="checkbox" value="4" class="edit-day-cb"> 周四</label>
+                <label><input type="checkbox" value="5" class="edit-day-cb"> 周五</label>
+                <label><input type="checkbox" value="6" class="edit-day-cb"> 周六</label>
+                <label><input type="checkbox" value="0" class="edit-day-cb"> 周日</label>
+              </div>
+              <div class="day-grid" id="edit_monthly_days" style="display:none">
+                <% for (var d = 1; d <= 31; d++) { %>
+                  <label><input type="checkbox" value="<%= d %>" class="edit-day-cb-monthly"> <%= d %>号</label>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-sm" style="background:#f3f4f6;color:#374151" type="button" onclick="closeEdit()">取消</button>
+          <button class="btn btn-primary" type="submit">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    var promotions = <%- JSON.stringify(promotions) %>;
+
+    // ===== 创建表单定时 =====
+    function toggleSchedule() {
+      var cb = document.getElementById('enable_schedule');
+      document.getElementById('schedule_box').classList.toggle('show', cb.checked);
+      if (cb.checked) {
+        var now = new Date();
+        var start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0);
+        var end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0);
+        document.querySelector('input[name="start_time"]').value = start.toISOString().slice(0,16);
+        document.querySelector('input[name="end_time"]').value = end.toISOString().slice(0,16);
+      }
+    }
+    function toggleScheduleType() {
+      var type = document.getElementById('schedule_type').value;
+      document.getElementById('weekly_days').style.display = type === 'weekly' ? 'flex' : 'none';
+      document.getElementById('monthly_days').style.display = type === 'monthly' ? 'flex' : 'none';
+      document.getElementById('day_label').textContent = type === 'weekly' ? '选择每周几开启' : '选择每月几号开启';
+    }
+    document.querySelector('form[action="/admin/promotions/create"]').addEventListener('submit', function(e) {
+      if (!document.getElementById('enable_schedule').checked) return;
+      var type = document.getElementById('schedule_type').value;
+      var checkedDays;
+      if (type === 'weekly') {
+        checkedDays = Array.from(document.querySelectorAll('.create-day-cb:checked')).map(function(cb) { return cb.value; });
+      } else {
+        checkedDays = Array.from(document.querySelectorAll('.create-day-cb-monthly:checked')).map(function(cb) { return cb.value; });
+      }
+      var h1 = document.createElement('input'); h1.type = 'hidden'; h1.name = 'schedule_type'; h1.value = type; this.appendChild(h1);
+      var h2 = document.createElement('input'); h2.type = 'hidden'; h2.name = 'schedule_days'; h2.value = checkedDays.join(','); this.appendChild(h2);
+      var h3 = document.createElement('input'); h3.type = 'hidden'; h3.name = 'schedule_duration'; h3.value = document.getElementById('schedule_duration').value; this.appendChild(h3);
+    });
+
+    // ===== 编辑弹窗 =====
+    function openEdit(id) {
+      var p = promotions.find(function(x) { return x.id == id; });
+      if (!p) return;
+      document.getElementById('editForm').action = '/admin/promotions/edit/' + id;
+      document.getElementById('edit_title').value = p.title || '';
+      document.getElementById('edit_type').value = p.type || 'promo';
+      document.getElementById('edit_discount_type').value = p.discount_type || 'percent';
+      document.getElementById('edit_discount').value = p.discount || 0;
+      document.getElementById('edit_sort_order').value = p.sort_order || 0;
+      document.getElementById('edit_description').value = p.description || '';
+      document.getElementById('edit_start_time').value = p.start_time ? p.start_time.slice(0,16) : '';
+      document.getElementById('edit_end_time').value = p.end_time ? p.end_time.slice(0,16) : '';
+      document.getElementById('edit_is_active').checked = p.is_active == 1;
+      // 获取已关联的商品ID
+      fetch('/api/promotion/' + id + '/products').then(function(r) { return r.json(); }).then(function(ids) {
+        document.querySelectorAll('.edit-product-cb').forEach(function(cb) {
+          cb.checked = ids.indexOf(parseInt(cb.value)) !== -1;
+        });
+      });
+      // 定时设置
+      var hasSchedule = p.schedule_type && p.schedule_type !== 'manual';
+      document.getElementById('edit_enable_schedule').checked = hasSchedule;
+      document.getElementById('edit_schedule_box').classList.toggle('show', hasSchedule);
+      if (hasSchedule) {
+        document.getElementById('edit_schedule_type').value = p.schedule_type || 'weekly';
+        document.getElementById('edit_schedule_duration').value = p.schedule_duration || 120;
+        toggleEditScheduleType();
+        var days = (p.schedule_days || '').split(',').filter(Boolean);
+        if (p.schedule_type === 'weekly') {
+          document.querySelectorAll('.edit-day-cb').forEach(function(cb) { cb.checked = days.indexOf(cb.value) !== -1; });
+        } else {
+          document.querySelectorAll('.edit-day-cb-monthly').forEach(function(cb) { cb.checked = days.indexOf(cb.value) !== -1; });
+        }
+      }
+      document.getElementById('editModal').classList.add('show');
+    }
+    function closeEdit() {
+      document.getElementById('editModal').classList.remove('show');
+    }
+    function toggleEditSchedule() {
+      var cb = document.getElementById('edit_enable_schedule');
+      document.getElementById('edit_schedule_box').classList.toggle('show', cb.checked);
+    }
+    function toggleEditScheduleType() {
+      var type = document.getElementById('edit_schedule_type').value;
+      document.getElementById('edit_weekly_days').style.display = type === 'weekly' ? 'flex' : 'none';
+      document.getElementById('edit_monthly_days').style.display = type === 'monthly' ? 'flex' : 'none';
+      document.getElementById('edit_day_label').textContent = type === 'weekly' ? '选择每周几开启' : '选择每月几号开启';
+    }
+    document.getElementById('editForm').addEventListener('submit', function(e) {
+      if (!document.getElementById('edit_enable_schedule').checked) {
+        var h0 = document.createElement('input'); h0.type = 'hidden'; h0.name = 'schedule_type'; h0.value = 'manual'; this.appendChild(h0);
+        var h0b = document.createElement('input'); h0b.type = 'hidden'; h0b.name = 'schedule_days'; h0b.value = ''; this.appendChild(h0b);
+        var h0c = document.createElement('input'); h0c.type = 'hidden'; h0c.name = 'schedule_duration'; h0c.value = '0'; this.appendChild(h0c);
+        return;
+      }
+      var type = document.getElementById('edit_schedule_type').value;
+      var checkedDays;
+      if (type === 'weekly') {
+        checkedDays = Array.from(document.querySelectorAll('#edit_weekly_days input:checked')).map(function(cb) { return cb.value; });
+      } else {
+        checkedDays = Array.from(document.querySelectorAll('#edit_monthly_days input:checked')).map(function(cb) { return cb.value; });
+      }
+      var h1 = document.createElement('input'); h1.type = 'hidden'; h1.name = 'schedule_days'; h1.value = checkedDays.join(','); this.appendChild(h1);
+    });
+    document.getElementById('editModal').addEventListener('click', function(e) {
+      if (e.target === this) closeEdit();
+    });
+  </script>
+</body>
+</html>

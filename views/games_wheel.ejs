@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>幸运大转盘 - 游戏中心</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎡</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a0033, #2d004d, #1a0033);
+      min-height: 100vh;
+      color: #fff;
+      overflow-x: hidden;
+    }
+    nav {
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(12px);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    nav a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    nav a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    nav .brand {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #e74c3c, #f39c12);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-right: auto;
+    }
+    nav .balance {
+      background: rgba(255,215,0,0.15);
+      color: #ffd700;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px;
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 800;
+      background: linear-gradient(90deg, #e74c3c, #f39c12, #e74c3c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      color: rgba(255,255,255,0.5);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .stats-row .s {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 8px 18px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+    }
+    .stats-row .s strong { color: #f39c12; }
+
+    /* 转盘容器 */
+    .wheel-wrapper {
+      position: relative;
+      width: 340px;
+      height: 340px;
+      margin-bottom: 30px;
+    }
+
+    /* 指针 */
+    .pointer {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      width: 0;
+      height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 30px solid #ffd700;
+      filter: drop-shadow(0 0 8px rgba(255,215,0,0.6));
+    }
+
+    /* 外圈装饰 */
+    .wheel-outer {
+      position: absolute;
+      top: -8px; left: -8px; right: -8px; bottom: -8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffd700, #f39c12);
+      padding: 6px;
+      box-shadow: 0 0 40px rgba(255,215,0,0.2);
+    }
+    .wheel-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas#wheelCanvas {
+      width: 100%;
+      height: 100%;
+      transition: none;
+    }
+
+    /* 中心按钮 */
+    .center-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 3px solid #ffd700;
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(231,76,60,0.4);
+      transition: all 0.2s;
+      line-height: 1.2;
+    }
+    .center-btn:hover:not(:disabled) {
+      transform: translate(-50%, -50%) scale(1.08);
+      box-shadow: 0 0 30px rgba(231,76,60,0.6);
+    }
+    .center-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .center-btn.spinning {
+      animation: pulse 0.5s ease infinite alternate;
+    }
+    @keyframes pulse {
+      from { box-shadow: 0 0 20px rgba(231,76,60,0.4); }
+      to { box-shadow: 0 0 40px rgba(231,76,60,0.8); }
+    }
+
+    /* 奖品列表 */
+    .prize-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+      max-width: 700px;
+      width: 100%;
+      margin-top: 20px;
+    }
+    .prize-item {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: center;
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+    }
+    .prize-item .p-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .prize-item .p-chance {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 2px;
+    }
+
+    /* 结果弹窗 */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.3s ease;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 40px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      animation: slideUp 0.4s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal .prize-icon {
+      font-size: 64px;
+      margin-bottom: 12px;
+    }
+    .modal h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .modal p {
+      color: rgba(255,255,255,0.6);
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+    .modal .btn-ok {
+      padding: 12px 40px;
+      border: none;
+      border-radius: 30px;
+      background: linear-gradient(90deg, #e74c3c, #c0392b);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .modal .btn-ok:hover { transform: scale(1.05); }
+
+    .toast {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 15px;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* 五彩纸屑 */
+    .confetti-container {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 200;
+      overflow: hidden;
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: -10px;
+      animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+
+    @media (max-width: 480px) {
+      .wheel-wrapper { width: 280px; height: 280px; }
+      .center-btn { width: 56px; height: 56px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/games" class="brand">🎡 幸运大转盘</a>
+    <a href="/games">🎮 游戏中心</a>
+    <a href="/games/blackjack">🃏 21点</a>
+    <a href="/shop">🏪 商城</a>
+    <span class="balance">💰 <span id="balanceDisplay"><%= user.balance.toFixed(2) %></span> 金币</span>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="container">
+    <div class="title">🎡 幸运大转盘</div>
+    <div class="subtitle">每天一次免费机会！转动转盘赢取丰厚奖励</div>
+
+    <div class="stats-row">
+      <div class="s">🎡 已转次数: <strong id="statSpins"><%= stats.wheel_spins || 0 %></strong></div>
+      <div class="s">💰 余额: <strong id="balanceSmall"><%= user.balance.toFixed(2) %></strong></div>
+    </div>
+
+    <div class="wheel-wrapper">
+      <div class="pointer"></div>
+      <div class="wheel-outer">
+        <div class="wheel-inner">
+          <canvas id="wheelCanvas" width="400" height="400"></canvas>
+        </div>
+      </div>
+      <button class="center-btn" id="spinBtn" onclick="spin()">
+        <span id="spinBtnText">转一转</span>
+      </button>
+    </div>
+
+    <div class="prize-list" id="prizeList"></div>
+  </div>
+
+  <!-- 结果弹窗 -->
+  <div class="modal-overlay" id="resultModal">
+    <div class="modal">
+      <div class="prize-icon" id="prizeIcon">🎉</div>
+      <h2 id="prizeTitle">恭喜获得！</h2>
+      <p id="prizeDesc">你获得了 50 金币</p>
+      <button class="btn-ok" onclick="closeModal()">太好了！</button>
+    </div>
+  </div>
+
+  <script>
+    var segments = <%- JSON.stringify(segments) %>;
+    var csrf = '<%= csrfToken %>';
+    var todaySpun = <%= todaySpun ? 'true' : 'false' %>;
+    var isSpinning = false;
+    var currentAngle = 0;
+
+    // 计算总权重和百分比
+    var totalWeight = segments.reduce(function(s, seg) { return s + seg.weight; }, 0);
+    segments.forEach(function(seg) {
+      seg.percent = ((seg.weight / totalWeight) * 100).toFixed(1);
+    });
+
+    function drawWheel(rotation) {
+      var canvas = document.getElementById('wheelCanvas');
+      var ctx = canvas.getContext('2d');
+      var w = canvas.width, h = canvas.height;
+      var cx = w / 2, cy = h / 2, r = w / 2 - 10;
+      var count = segments.length;
+      var arc = (2 * Math.PI) / count;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // 绘制每个扇区
+      for (var i = 0; i < count; i++) {
+        var startAngle = rotation + i * arc;
+        var endAngle = startAngle + arc;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = segments[i].color;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 文字
+        var textAngle = startAngle + arc / 2;
+        var label = segments[i].name;
+        // 截断长文本
+        if (label.length > 5) label = label.slice(0, 4) + '…';
+        ctx.save();
+        ctx.translate(cx + Math.cos(textAngle) * (r * 0.65), cy + Math.sin(textAngle) * (r * 0.65));
+        ctx.rotate(textAngle + Math.PI / 2);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
+
+      // 内圈装饰
+      ctx.beginPath();
+      ctx.arc(cx, cy, 20, 0, 2 * Math.PI);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,215,0,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 外圈亮点
+      for (var i = 0; i < 20; i++) {
+        var a = (i / 20) * 2 * Math.PI;
+        var x = cx + Math.cos(a) * (r - 2);
+        var y = cy + Math.sin(a) * (r - 2);
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255,215,0,' + (0.3 + 0.7 * (i % 2)) + ')';
+        ctx.fill();
+      }
+    }
+
+    function drawPrizeList() {
+      var list = document.getElementById('prizeList');
+      list.innerHTML = '';
+      segments.forEach(function(seg) {
+        var div = document.createElement('div');
+        div.className = 'prize-item';
+        div.innerHTML = '<div class="p-name" style="color:' + seg.color + '">' + seg.name + '</div>' +
+          '<div class="p-chance">概率 ' + seg.percent + '%</div>';
+        list.appendChild(div);
+      });
+    }
+
+    // 初始绘制
+    drawWheel(0);
+    drawPrizeList();
+
+    if (todaySpun) {
+      document.getElementById('spinBtn').disabled = true;
+      document.getElementById('spinBtnText').textContent = '明日再来';
+    }
+
+    function showToast(msg) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(function() { t.classList.remove('show'); }, 2500);
+    }
+
+    function spin() {
+      if (isSpinning) return;
+      if (todaySpun) { showToast('今日已转过了，明天再来吧！'); return; }
+
+      isSpinning = true;
+      var btn = document.getElementById('spinBtn');
+      btn.disabled = true;
+      document.getElementById('spinBtnText').textContent = '旋转中…';
+      btn.classList.add('spinning');
+
+      fetch('/api/games/wheel/spin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '_csrf=' + encodeURIComponent(csrf)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) {
+          showToast(data.msg);
+          isSpinning = false;
+          btn.disabled = false;
+          document.getElementById('spinBtnText').textContent = '转一转';
+          btn.classList.remove('spinning');
+          return;
+        }
+
+        // 计算目标角度：让选中的扇区对准指针（顶部）
+        var count = segments.length;
+        var arc = 360 / count;
+        // 指针在顶部（-90度位置），扇区中心对准指针
+        var targetSeg = data.index;
+        // 目标扇区的中心角度（从顶部顺时针）
+        var targetAngle = 360 - (targetSeg * arc + arc / 2);
+        // 随机转 5-8 圈
+        var spins = 5 + Math.random() * 3;
+        var finalAngle = spins * 360 + targetAngle;
+
+        // 动画旋转
+        var startAngle = currentAngle;
+        var targetRotation = startAngle + (finalAngle - (startAngle % 360));
+        var duration = 4000 + Math.random() * 1000;
+        var startTime = Date.now();
+
+        function animate() {
+          var elapsed = Date.now() - startTime;
+          var progress = Math.min(elapsed / duration, 1);
+          // easeOutCubic
+          var eased = 1 - Math.pow(1 - progress, 3);
+          var angle = startAngle + (targetRotation - startAngle) * eased;
+
+          drawWheel((angle * Math.PI) / 180);
+
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            currentAngle = targetRotation;
+            isSpinning = false;
+            btn.classList.remove('spinning');
+            document.getElementById('spinBtnText').textContent = '转一转';
+
+            // 更新余额
+            if (data.balance !== undefined) {
+              document.getElementById('balanceDisplay').textContent = data.balance.toFixed(2);
+              document.getElementById('balanceSmall').textContent = data.balance.toFixed(2);
+            }
+
+            // 处理结果
+            if (data.canRetry) {
+              showToast('🎉 再来一次！再转一次！');
+              todaySpun = false;
+              btn.disabled = false;
+              return;
+            }
+
+            todaySpun = true;
+            btn.disabled = true;
+            document.getElementById('spinBtnText').textContent = '明日再来';
+
+            // 显示弹窗
+            showResultModal(data.segment);
+
+            // 刷新统计
+            var s = document.getElementById('statSpins');
+            s.textContent = parseInt(s.textContent) + 1;
+
+            // 非谢谢参与就放烟花
+            if (data.segment.type !== 'none') {
+              launchConfetti();
+            }
+          }
+        }
+        animate();
+      })
+      .catch(function(e) {
+        showToast('网络错误');
+        isSpinning = false;
+        var btn2 = document.getElementById('spinBtn');
+        btn2.disabled = false;
+        document.getElementById('spinBtnText').textContent = '转一转';
+        btn2.classList.remove('spinning');
+      });
+    }
+
+    function showResultModal(seg) {
+      var modal = document.getElementById('resultModal');
+      document.getElementById('prizeIcon').textContent =
+        seg.type === 'balance' ? '💰' :
+        seg.type === 'points' ? '⭐' :
+        seg.type === 'coupon' ? '🎫' :
+        seg.type === 'retry' ? '🔄' : '😅';
+      document.getElementById('prizeTitle').textContent = seg.name;
+      document.getElementById('prizeDesc').textContent =
+        seg.type === 'balance' ? '获得 ' + seg.value + ' 金币，已存入账户！' :
+        seg.type === 'points' ? '获得 ' + seg.value + ' 积分！' :
+        seg.type === 'coupon' ? '获得 ' + seg.value + ' 元优惠券，已发放到账户！' :
+        seg.type === 'retry' ? '好运再来一次！再转一次吧！' :
+        '下次一定！';
+      modal.classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('resultModal').classList.remove('open');
+    }
+
+    // 点击遮罩层关闭
+    document.getElementById('resultModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    function launchConfetti() {
+      var container = document.createElement('div');
+      container.className = 'confetti-container';
+      document.body.appendChild(container);
+
+      var colors = ['#ff6b6b', '#ffd700', '#4ecdc4', '#45b7d1', '#f39c12', '#9b59b6', '#2ecc71'];
+      for (var i = 0; i < 60; i++) {
+        var confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.width = (6 + Math.random() * 8) + 'px';
+        confetti.style.height = (6 + Math.random() * 8) + 'px';
+        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+        confetti.style.animationDelay = (Math.random() * 0.5) + 's';
+        container.appendChild(confetti);
+      }
+
+      setTimeout(function() {
+        if (container.parentNode) container.parentNode.removeChild(container);
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

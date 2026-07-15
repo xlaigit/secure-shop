@@ -68,6 +68,11 @@
       <label>名称：<input name="name" required></label><br>
       <label>价格：<input type="number" step="0.01" name="price" required></label><br>
       <label>库存：<input type="number" name="stock" value="999"></label><br>
+      <label>分类：<select name="category" style="padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;width:200px">
+        <% (categories || []).forEach(function(c) { %>
+          <option value="<%= c.name %>"><%= c.icon %> <%= c.name %></option>
+        <% }) %>
+      </select></label><br>
       <label>运费：<select name="shipping_policy" style="padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;width:200px">
         <option value="0">📦 包邮（商家承担）</option>
         <option value="1" selected>💰 不包邮（买家承担）</option>
@@ -81,7 +86,7 @@
       <% products.forEach(p => { %>
         <li style="flex-direction:column;align-items:flex-start;gap:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-          <span><strong><%= p.name %></strong> - ¥<%= p.price %> (库存:<%= p.stock %>)</span>
+          <span><strong><%= p.name %></strong> - ¥<%= p.price %> (库存:<%= p.stock %>) <span style="font-size:11px;color:#6b7280">[<%= p.category || '未分类' %>]</span></span>
           <form method="POST" action="/shop/product/delete/<%= p.id %>" style="display:inline">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" style="background:#fc8181">🗑️ 删除</button>
@@ -173,7 +178,6 @@
   </div>
 </div>
 <script>
-(function(){
 var shipInfoData = {
   '邮政': { speed: '标准', kmh: '30km/h', fee: '最低' },
   '中通': { speed: '标准', kmh: '50km/h', fee: '中等' },
@@ -206,6 +210,5 @@ for (var i = 0; i < btns.length; i++) {
 }
 var cs = document.getElementById('carrierSelect');
 if (cs) cs.addEventListener('change', updateShipInfo);
-})();
 </script>
 </body></html>

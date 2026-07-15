@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>21点 - 游戏中心</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0a3d0a, #1a5c1a, #0d3b0d);
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+    nav {
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(12px);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    nav a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    nav a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    nav .brand {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffd700;
+      margin-right: auto;
+      text-shadow: 0 0 20px rgba(255,215,0,0.3);
+    }
+    nav .balance {
+      background: rgba(255,215,0,0.15);
+      color: #ffd700;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .game-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      position: relative;
+    }
+
+    /* 游戏标题 */
+    .game-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: #ffd700;
+      text-shadow: 0 0 30px rgba(255,215,0,0.2);
+      margin-bottom: 10px;
+    }
+    .game-title span { color: #fff; }
+
+    /* 统计栏 */
+    .stats-row {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .stats-row .s {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 8px 18px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+    }
+    .stats-row .s strong { color: #ffd700; }
+
+    /* 桌面 */
+    .table {
+      background: rgba(0,60,0,0.5);
+      border: 2px solid rgba(255,215,0,0.15);
+      border-radius: 24px;
+      padding: 30px 40px;
+      width: 100%;
+      max-width: 800px;
+      min-height: 400px;
+      box-shadow: inset 0 0 80px rgba(0,0,0,0.3), 0 0 40px rgba(0,0,0,0.4);
+      position: relative;
+    }
+
+    .dealer-area, .player-area {
+      margin-bottom: 20px;
+    }
+    .area-label {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .area-label .value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .cards {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-height: 90px;
+    }
+
+    .card {
+      width: 72px;
+      height: 100px;
+      background: #fff;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      position: relative;
+      transition: transform 0.3s ease;
+      animation: dealCard 0.3s ease-out;
+    }
+    @keyframes dealCard {
+      from { transform: translateY(-40px) scale(0.8); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .card:hover { transform: translateY(-4px); }
+    .card .rank-suit {
+      font-size: 22px;
+      line-height: 1;
+    }
+    .card .suit-icon {
+      font-size: 28px;
+      line-height: 1;
+    }
+    .card.red { color: #d32f2f; }
+    .card.black { color: #1a1a1a; }
+    .card-back {
+      background: linear-gradient(135deg, #1a237e, #283593);
+      border: 3px solid #ffd700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .card-back::after {
+      content: '?';
+      color: #ffd700;
+      font-size: 30px;
+      font-weight: 700;
+    }
+    .card-back .rank-suit, .card-back .suit-icon { display: none; }
+
+    /* 分隔线 */
+    .divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      margin: 16px 0;
+    }
+
+    /* 结果消息 */
+    .result-msg {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 800;
+      padding: 16px;
+      margin: 10px 0;
+      border-radius: 16px;
+      animation: fadeIn 0.5s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    .result-msg.win { color: #ffd700; background: rgba(255,215,0,0.1); }
+    .result-msg.lose { color: #ff6b6b; background: rgba(255,107,107,0.1); }
+    .result-msg.push { color: #4ecdc4; background: rgba(78,205,196,0.1); }
+    .result-msg.blackjack { color: #ffd700; background: rgba(255,215,0,0.15); text-shadow: 0 0 20px rgba(255,215,0,0.3); }
+
+    /* 控制区 */
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .controls .btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #fff;
+    }
+    .controls .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    .controls .btn:hover:not(:disabled) { transform: translateY(-2px); }
+    .btn-hit { background: linear-gradient(90deg, #2196F3, #1976D2); }
+    .btn-stand { background: linear-gradient(90deg, #f44336, #d32f2f); }
+    .btn-double { background: linear-gradient(90deg, #ff9800, #f57c00); }
+    .btn-start { background: linear-gradient(90deg, #4CAF50, #388E3C); }
+    .btn-new { background: linear-gradient(90deg, #9C27B0, #7B1FA2); }
+
+    /* 下注区 */
+    .bet-area {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .bet-area input {
+      background: rgba(0,0,0,0.4);
+      border: 2px solid rgba(255,215,0,0.3);
+      border-radius: 12px;
+      padding: 10px 18px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      width: 140px;
+      text-align: center;
+      outline: none;
+    }
+    .bet-area input:focus { border-color: #ffd700; }
+    .bet-area .quick-bet {
+      display: flex;
+      gap: 6px;
+    }
+    .bet-area .quick-bet button {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .bet-area .quick-bet button:hover {
+      background: rgba(255,215,0,0.2);
+      border-color: #ffd700;
+    }
+
+    /* 消息提示 */
+    .toast {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 15px;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* 历史记录 */
+    .history-toggle {
+      color: rgba(255,255,255,0.4);
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 16px;
+      text-align: center;
+      transition: color 0.2s;
+    }
+    .history-toggle:hover { color: #ffd700; }
+    .history-panel {
+      max-width: 800px;
+      width: 100%;
+      margin-top: 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 16px;
+      padding: 16px;
+      display: none;
+    }
+    .history-panel.open { display: block; }
+    .history-panel table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .history-panel th {
+      color: rgba(255,255,255,0.5);
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .history-panel td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .history-panel .r-win { color: #ffd700; }
+    .history-panel .r-lose { color: #ff6b6b; }
+    .history-panel .r-push { color: #4ecdc4; }
+    .history-panel .r-blackjack { color: #ffd700; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: rgba(255,255,255,0.3);
+    }
+    .empty-state .big-icon { font-size: 72px; margin-bottom: 16px; }
+    .empty-state p { font-size: 16px; }
+
+    @media (max-width: 600px) {
+      .table { padding: 16px; }
+      .card { width: 56px; height: 80px; font-size: 16px; }
+      .card .rank-suit { font-size: 18px; }
+      .card .suit-icon { font-size: 22px; }
+      .game-title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/games" class="brand">🃏 21点</a>
+    <a href="/games">🎮 游戏中心</a>
+    <a href="/games/wheel">🎡 幸运转盘</a>
+    <a href="/shop">🏪 商城</a>
+    <span class="balance">💰 <span id="balanceDisplay"><%= user.balance.toFixed(2) %></span> 金币</span>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="game-container">
+    <div class="game-title">♠ <span>21</span> ♦ <span>点</span> ♣</div>
+
+    <div class="stats-row">
+      <div class="s">🏆 胜利: <strong id="statWins"><%= stats.blackjack_wins || 0 %></strong></div>
+      <div class="s">📊 局数: <strong id="statGames"><%= stats.blackjack_games || 0 %></strong></div>
+      <div class="s">💰 净盈亏: <strong id="statNet"><%= (stats.blackjack_net || 0).toFixed(0) %></strong></div>
+    </div>
+
+    <!-- 下注区 -->
+    <div class="bet-area" id="betArea">
+      <input type="number" id="betInput" value="50" min="10" step="10">
+      <div class="quick-bet">
+        <button onclick="setBet(10)">10</button>
+        <button onclick="setBet(50)">50</button>
+        <button onclick="setBet(100)">100</button>
+        <button onclick="setBet(500)">500</button>
+        <button onclick="setBet(<%= Math.floor(user.balance) %>)">All-in</button>
+      </div>
+      <button class="btn btn-start" onclick="startGame()">🃏 开始</button>
+    </div>
+
+    <!-- 桌面 -->
+    <div class="table" id="table">
+      <div class="empty-state" id="emptyState">
+        <div class="big-icon">🃏</div>
+        <p>输入下注金额，点击「开始」开始游戏</p>
+        <p style="font-size:13px;margin-top:6px;">规则：比庄家更接近21点即赢，黑杰克（A+10）3倍赔付</p>
+      </div>
+
+      <!-- 游戏区域（初始隐藏） -->
+      <div id="gameArea" style="display:none">
+        <!-- 庄家 -->
+        <div class="dealer-area">
+          <div class="area-label">
+            🤵 庄家
+            <span class="value" id="dealerValue"></span>
+          </div>
+          <div class="cards" id="dealerCards"></div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- 玩家 -->
+        <div class="player-area">
+          <div class="area-label">
+            👤 玩家
+            <span class="value" id="playerValue"></span>
+          </div>
+          <div class="cards" id="playerCards"></div>
+        </div>
+
+        <!-- 结果 -->
+        <div id="resultArea"></div>
+
+        <!-- 控制按钮 -->
+        <div class="controls" id="controls">
+          <button class="btn btn-hit" id="btnHit" onclick="hit()">👆 要牌</button>
+          <button class="btn btn-stand" id="btnStand" onclick="stand()">✋ 停牌</button>
+          <button class="btn btn-double" id="btnDouble" onclick="doubleDown()">📈 加倍</button>
+          <button class="btn btn-new" id="btnNew" style="display:none" onclick="startGame()">🔄 新一局</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="history-toggle" onclick="toggleHistory()">📜 历史记录</div>
+    <div class="history-panel" id="historyPanel">
+      <table>
+        <thead><tr><th>时间</th><th>下注</th><th>结果</th><th>赔付</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let currentBet = 0;
+    let csrf = '<%= csrfToken %>';
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    function setBet(val) {
+      document.getElementById('betInput').value = val;
+    }
+
+    function updateBalance(bal) {
+      document.getElementById('balanceDisplay').textContent = bal.toFixed(2);
+    }
+
+    function renderCard(card, faceUp) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      if (!faceUp || card.rank === '?') {
+        div.classList.add('card-back');
+        return div;
+      }
+      const isRed = card.suit === '♥' || card.suit === '♦';
+      div.classList.add(isRed ? 'red' : 'black');
+      div.innerHTML = '<div class="rank-suit">' + card.rank + '</div><div class="suit-icon">' + card.suit + '</div>';
+      return div;
+    }
+
+    function renderCards(container, cards, faceUp) {
+      container.innerHTML = '';
+      cards.forEach(function(c) {
+        container.appendChild(renderCard(c, faceUp !== false));
+      });
+    }
+
+    function startGame() {
+      const bet = parseFloat(document.getElementById('betInput').value);
+      if (!bet || bet < 10) { showToast('最低下注 10 金币'); return; }
+      if (bet > parseFloat(document.getElementById('balanceDisplay').textContent)) {
+        showToast('余额不足'); return;
+      }
+
+      currentBet = bet;
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('gameArea').style.display = 'block';
+      document.getElementById('betArea').style.display = 'none';
+      document.getElementById('resultArea').innerHTML = '';
+      document.getElementById('btnNew').style.display = 'none';
+      document.getElementById('btnHit').style.display = 'inline-block';
+      document.getElementById('btnStand').style.display = 'inline-block';
+      document.getElementById('btnDouble').style.display = 'inline-block';
+
+      fetch('/api/games/blackjack/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'bet=' + bet + '&_csrf=' + encodeURIComponent(csrf)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) { showToast(data.msg); resetUI(); return; }
+
+        updateBalance(data.balance);
+        renderCards(document.getElementById('playerCards'), data.playerHand);
+        renderCards(document.getElementById('dealerCards'), data.dealerHand);
+        document.getElementById('playerValue').textContent = data.playerValue;
+        document.getElementById('dealerValue').textContent = '?';
+
+        document.getElementById('btnHit').disabled = !data.canHit;
+        document.getElementById('btnStand').disabled = !data.canStand;
+        document.getElementById('btnDouble').disabled = !data.canDouble;
+
+        if (data.phase === 'settled') {
+          handleSettlement(data);
+        }
+      })
+      .catch(function(e) { showToast('网络错误'); resetUI(); });
+    }
+
+    function hit() {
+      fetch('/api/games/blackjack/hit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '_csrf=' + encodeURIComponent(csrf)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) { showToast(data.msg); return; }
+
+        renderCards(document.getElementById('playerCards'), data.playerHand);
+        document.getElementById('playerValue').textContent = data.playerValue;
+        document.getElementById('btnHit').disabled = !data.canHit;
+        document.getElementById('btnStand').disabled = !data.canStand;
+        document.getElementById('btnDouble').disabled = !data.canDouble;
+
+        if (data.phase === 'settled') {
+          handleSettlement(data);
+        }
+      })
+      .catch(function(e) { showToast('网络错误'); });
+    }
+
+    function stand() {
+      fetch('/api/games/blackjack/stand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '_csrf=' + encodeURIComponent(csrf)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) { showToast(data.msg); return; }
+
+        renderCards(document.getElementById('playerCards'), data.playerHand);
+        renderCards(document.getElementById('dealerCards'), data.dealerHand);
+        document.getElementById('playerValue').textContent = data.playerValue;
+        document.getElementById('dealerValue').textContent = data.dealerValue;
+
+        if (data.phase === 'settled') {
+          handleSettlement(data);
+        }
+      })
+      .catch(function(e) { showToast('网络错误'); });
+    }
+
+    function doubleDown() {
+      fetch('/api/games/blackjack/double', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '_csrf=' + encodeURIComponent(csrf)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) { showToast(data.msg); return; }
+
+        updateBalance(data.balance);
+        renderCards(document.getElementById('playerCards'), data.playerHand);
+        renderCards(document.getElementById('dealerCards'), data.dealerHand);
+        document.getElementById('playerValue').textContent = data.playerValue;
+        document.getElementById('dealerValue').textContent = data.dealerValue;
+
+        if (data.phase === 'settled') {
+          handleSettlement(data);
+        }
+      })
+      .catch(function(e) { showToast('网络错误'); });
+    }
+
+    function handleSettlement(data) {
+      const resultArea = document.getElementById('resultArea');
+      const btnHit = document.getElementById('btnHit');
+      const btnStand = document.getElementById('btnStand');
+      const btnDouble = document.getElementById('btnDouble');
+      const btnNew = document.getElementById('btnNew');
+
+      btnHit.style.display = 'none';
+      btnStand.style.display = 'none';
+      btnDouble.style.display = 'none';
+      btnNew.style.display = 'inline-block';
+
+      let msg = '', cls = '';
+      if (data.result === 'blackjack') {
+        msg = '🎉 黑杰克！ 赢得 ' + data.payout + ' 金币！';
+        cls = 'blackjack';
+      } else if (data.result === 'win') {
+        msg = '🎉 你赢了！ 获得 ' + data.payout + ' 金币';
+        cls = 'win';
+      } else if (data.result === 'lose') {
+        msg = '😞 庄家赢了';
+        cls = 'lose';
+      } else if (data.result === 'push') {
+        msg = '🤝 平局，赌注退还';
+        cls = 'push';
+      }
+
+      resultArea.innerHTML = '<div class="result-msg ' + cls + '">' + msg + '</div>';
+
+      if (data.balance !== undefined) {
+        updateBalance(data.balance);
+      }
+
+      // 自动刷新统计数据
+      refreshStats();
+    }
+
+    function resetUI() {
+      document.getElementById('betArea').style.display = 'flex';
+      document.getElementById('btnNew').style.display = 'none';
+    }
+
+    function refreshStats() {
+      fetch('/api/games/blackjack/history', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok || !data.records) return;
+        var wins = 0, games = data.records.length, net = 0;
+        data.records.forEach(function(r) {
+          if (r.result === 'win' || r.result === 'blackjack') wins++;
+          net += r.payout - (r.result === 'push' ? r.bet_amount : 0);
+        });
+        document.getElementById('statWins').textContent = wins;
+        document.getElementById('statGames').textContent = games;
+        document.getElementById('statNet').textContent = net.toFixed(0);
+      });
+    }
+
+    function toggleHistory() {
+      var panel = document.getElementById('historyPanel');
+      if (panel.classList.contains('open')) {
+        panel.classList.remove('open');
+        return;
+      }
+      panel.classList.add('open');
+      fetch('/api/games/blackjack/history')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok || !data.records) return;
+        var tbody = document.getElementById('historyBody');
+        tbody.innerHTML = '';
+        data.records.forEach(function(r) {
+          var tr = document.createElement('tr');
+          var cls = 'r-' + (r.result === 'blackjack' ? 'win' : r.result);
+          var resultText = { win: '胜利', lose: '失败', push: '平局', blackjack: '黑杰克' }[r.result] || r.result;
+          tr.innerHTML = '<td>' + new Date(r.created_at).toLocaleString() + '</td>' +
+            '<td>' + r.bet_amount + '</td>' +
+            '<td class="' + cls + '">' + resultText + '</td>' +
+            '<td>' + r.payout + '</td>';
+          tbody.appendChild(tr);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

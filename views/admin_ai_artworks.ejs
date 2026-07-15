@@ -139,13 +139,16 @@ d:\肖宇帆\HTML项目\views\admin_ai_artworks.ejs
         <div class="actions">
           <% if (art.status === 'pending') { %>
           <form method="POST" action="/admin/ai-artworks/<%= art.id %>/approve">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-approve">✅ 通过</button>
           </form>
           <form method="POST" action="/admin/ai-artworks/<%= art.id %>/reject">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-reject">❌ 拒绝</button>
           </form>
           <% } %>
           <form method="POST" action="/admin/ai-artworks/<%= art.id %>/delete" onsubmit="return confirm('确定删除该作品？此操作不可撤销。')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-delete">🗑️ 删除</button>
           </form>
         </div>

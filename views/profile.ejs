@@ -72,12 +72,11 @@
           <div class="icon">📁</div>
           <p>点击选择头像图片</p>
           <p class="hint">支持 JPG/PNG/GIF/WebP，最大 10MB</p>
-          <input type="file" id="avatarFile" accept="image/*" onchange="previewAvatar(this)">
+          <input type="file" name="avatar" id="avatarFile" accept="image/*" onchange="previewAvatar(this)" form="uploadForm">
         </label>
       </div>
       <form method="POST" action="/upload" enctype="multipart/form-data" id="uploadForm">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="avatar_file" id="hiddenFile" value="">
         <button type="submit" class="btn btn-primary">📤 上传头像</button>
       </form>
       <p style="text-align:center;margin-top:12px">

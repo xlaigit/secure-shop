@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安全监控 · 后台管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
+    .alert-bar{background:linear-gradient(135deg,#ef4444,#dc2626);color:white;padding:12px 28px;display:none;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(239,68,68,0.3);animation:slideDown 0.3s ease}
+    @keyframes slideDown{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .alert-bar .alert-content{display:flex;align-items:center;gap:10px;font-weight:600}
+    .alert-bar .close-alert{background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700}
+    .alert-bar .close-alert:hover{background:rgba(255,255,255,0.3)}
+    .topbar{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .topbar .left{display:flex;align-items:center;gap:12px}
+    .topbar .logo{width:38px;height:38px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .topbar .logo svg{width:20px;height:20px;color:white}
+    .topbar .title{font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .topbar .title small{display:block;font-size:12px;color:#6b7280;font-weight:500;margin-top:2px}
+    .topbar nav{display:flex;flex-wrap:wrap;gap:4px}
+    .topbar nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
+    .topbar nav a:hover{background:#f3f4f6;color:#667eea}
+    .topbar nav a.active{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.3)}
+    .topbar nav a.danger{color:#dc2626}
+    .topbar nav a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1200px;margin:0 auto;padding:28px}
+    .welcome{margin-bottom:24px}
+    .welcome h1{font-size:26px;font-weight:700;letter-spacing:-0.5px}
+    .welcome p{color:#6b7280;font-size:14px;margin-top:6px}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
+    .stat{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border-left:4px solid #667eea;text-decoration:none;color:inherit;display:block}
+    .stat:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,0.08)}
+    .stat .label{font-size:12.5px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+    .stat .num{font-size:32px;font-weight:700;color:#1f2937;margin-top:8px;letter-spacing:-1px}
+    .stat .ico{float:right;font-size:24px;margin-top:-4px;opacity:0.6}
+    .stat.total{border-left-color:#ef4444;background:linear-gradient(135deg,#fff 0%,#fef2f2 100%)}
+    .stat.today{border-left-color:#f59e0b;background:linear-gradient(135deg,#fff 0%,#fffbeb 100%)}
+    .stat.types{border-left-color:#8b5cf6;background:linear-gradient(135deg,#fff 0%,#f5f3ff 100%)}
+    .section-title{font-size:16px;font-weight:700;margin:12px 0 14px;color:#1f2937;display:flex;align-items:center;gap:8px}
+    .section-title::before{content:'';width:4px;height:18px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:2px}
+    .charts-row{display:grid;grid-template-columns:1fr 1.5fr;gap:16px;margin-bottom:24px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s}
+    .card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,0.08)}
+    .chart-container{position:relative;height:300px;width:100%}
+    .table-card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:24px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead tr{background:#f9fafb;border-bottom:2px solid #e5e7eb}
+    th{padding:12px;text-align:left;color:#6b7280;font-weight:600}
+    td{padding:12px;border-bottom:1px solid #f3f4f6}
+    tbody tr:hover{background:#f9fafb}
+    .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600}
+    .badge-xss{background:#fef2f2;color:#dc2626}
+    .badge-sql{background:#fef7ed;color:#c2410c}
+    .badge-csrf{background:#eff6ff;color:#1d4ed8}
+    .badge-rce{background:#f5f3ff;color:#6d28d9}
+    .badge-other{background:#f3f4f6;color:#374151}
+    .ip-cell{font-family:monospace;font-weight:500}
+    .url-cell{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ua-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6b7280}
+    .empty-row td{text-align:center;color:#9ca3af;padding:20px}
+    .rank-num{display:inline-block;width:24px;height:24px;text-align:center;line-height:24px;border-radius:50%;font-weight:700;font-size:12px}
+    .rank-1{background:#fbbf24;color:white}
+    .rank-2{background:#94a3b8;color:white}
+    .rank-3{background:#b45309;color:white}
+    @media (max-width:900px){
+      .stats{grid-template-columns:repeat(2,1fr)}
+      .charts-row{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="alert-bar" id="alertBar">
+    <div class="alert-content">
+      <span>🚨</span>
+      <span id="alertText">检测到新的攻击尝试！</span>
+    </div>
+    <button class="close-alert" id="closeAlert">关闭</button>
+  </div>
+
+  <div class="topbar">
+    <div class="left">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+      </div>
+      <div class="title">后台管理系统<small>Security Practice Mall · Admin Panel</small></div>
+    </div>
+    <nav>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a class="active" href="/admin/security">🛡️ 安全监控</a>
+      <a href="/admin/refunds">💸 退款管理</a>
+      <a href="/admin/flash">⚡ 秒杀管理</a>
+      <a href="/admin/coupons">🎫 优惠券管理</a>
+      <a href="/admin/announcements">📢 公告管理</a>
+      <a href="/admin/reports">🚩 举报管理</a>
+      <a href="/admin/appeals">📢 申诉管理</a>
+      <a href="/admin/ai-artworks">🎨 AI作品</a>
+      <a href="/admin/users">👥 用户管理</a>
+      <a href="/admin/products">📦 商品管理</a>
+      <a href="/admin/orders">📋 订单管理</a>
+      <a href="/chat">💬 聊天室</a>
+      <a class="danger" href="/admin/logout">退出</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="welcome">
+      <h1>🛡️ 安全监控仪表盘</h1>
+      <p>实时监控平台攻击尝试，分析攻击趋势和来源</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat total">
+        <span class="ico">⚠️</span>
+        <div class="label">总攻击次数</div>
+        <div class="num"><%= totalAttacks %></div>
+      </div>
+      <div class="stat today">
+        <span class="ico">📅</span>
+        <div class="label">今日攻击</div>
+        <div class="num"><%= todayAttacks %></div>
+      </div>
+      <div class="stat types">
+        <span class="ico">📊</span>
+        <div class="label">攻击类型</div>
+        <div class="num"><%= typeDist ? typeDist.length : 0 %></div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card">
+        <div class="section-title" style="margin:0 0 16px">攻击类型分布</div>
+        <div class="chart-container">
+          <canvas id="typeChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title" style="margin:0 0 16px">近7天攻击趋势</div>
+        <div class="chart-container">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">👤 攻击来源 IP 排行榜</div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">排名</th>
+            <th>IP 地址</th>
+            <th style="width:120px;text-align:center">攻击次数</th>
+          </tr>
+        </thead>
+        <tbody id="topIpTable">
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title">📋 最近攻击日志</div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>IP 地址</th>
+            <th>方法</th>
+            <th>URL</th>
+            <th>攻击类型</th>
+            <th>User Agent</th>
+          </tr>
+        </thead>
+        <tbody id="logsTable">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const typeDist = <%= JSON.stringify(typeDist) %>;
+    const topIps = <%= JSON.stringify(topIps) %>;
+    const logs = <%= JSON.stringify(logs) %>;
+
+    const colors = [
+      'rgba(239, 68, 68, 0.8)',
+      'rgba(245, 158, 11, 0.8)',
+      'rgba(59, 130, 246, 0.8)',
+      'rgba(16, 185, 129, 0.8)',
+      'rgba(139, 92, 246, 0.8)',
+      'rgba(236, 72, 153, 0.8)',
+      'rgba(107, 114, 128, 0.8)',
+    ];
+
+    const borderColors = [
+      'rgb(239, 68, 68)',
+      'rgb(245, 158, 11)',
+      'rgb(59, 130, 246)',
+      'rgb(16, 185, 129)',
+      'rgb(139, 92, 246)',
+      'rgb(236, 72, 153)',
+      'rgb(107, 114, 128)',
+    ];
+
+    function renderTypeChart() {
+      const ctx = document.getElementById('typeChart').getContext('2d');
+      const labels = typeDist.map(item => item.attack_type);
+      const data = typeDist.map(item => item.n);
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: colors.slice(0, data.length),
+            borderColor: borderColors.slice(0, data.length),
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 15,
+                font: {
+                  size: 12
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTopIps() {
+      const tbody = document.getElementById('topIpTable');
+      let html = '';
+      if (!topIps || topIps.length === 0) {
+        html = '<tr class="empty-row"><td colspan="3">暂无攻击记录</td></tr>';
+      } else {
+        topIps.forEach((item, index) => {
+          const rank = index + 1;
+          let rankClass = '';
+          if (rank === 1) rankClass = 'rank-1';
+          else if (rank === 2) rankClass = 'rank-2';
+          else if (rank === 3) rankClass = 'rank-3';
+          html += `<tr>
+            <td><span class="rank-num ${rankClass}">${rank}</span></td>
+            <td class="ip-cell">${item.ip}</td>
+            <td style="text-align:center"><strong>${item.n}</strong></td>
+          </tr>`;
+        });
+      }
+      tbody.innerHTML = html;
+    }
+
+    function getBadgeClass(type) {
+      if (!type) return 'badge-other';
+      type = type.toLowerCase();
+      if (type.includes('xss')) return 'badge-xss';
+      if (type.includes('sql')) return 'badge-sql';
+      if (type.includes('csrf')) return 'badge-csrf';
+      if (type.includes('rce') || type.includes('command')) return 'badge-rce';
+      return 'badge-other';
+    }
+
+    function renderLogs() {
+      const tbody = document.getElementById('logsTable');
+      let html = '';
+      if (!logs || logs.length === 0) {
+        html = '<tr class="empty-row"><td colspan="6">暂无攻击日志</td></tr>';
+      } else {
+        logs.forEach(item => {
+          const badgeClass = getBadgeClass(item.attack_type);
+          html += `<tr>
+            <td>${item.time}</td>
+            <td class="ip-cell">${item.ip}</td>
+            <td><strong>${item.method}</strong></td>
+            <td class="url-cell" title="${item.url}">${item.url}</td>
+            <td><span class="badge ${badgeClass}">${item.attack_type}</span></td>
+            <td class="ua-cell" title="${item.user_agent}">${item.user_agent}</td>
+          </tr>`;
+        });
+      }
+      tbody.innerHTML = html;
+    }
+
+    function loadTrendChart() {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/admin/attack-stats?days=7', true);
+      xhr.onload = function() {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          const ctx = document.getElementById('trendChart').getContext('2d');
+          const days = res.days || [];
+          const dataMap = res.data || {};
+          const types = new Set();
+          days.forEach(day => {
+            Object.keys(dataMap[day] || {}).forEach(t => types.add(t));
+          });
+          const datasets = Array.from(types).map((type, i) => {
+            const data = days.map(day => dataMap[day]?.[type] || 0);
+            return {
+              label: type,
+              data: data,
+              borderColor: borderColors[i % borderColors.length],
+              backgroundColor: colors[i % colors.length],
+              tension: 0.3,
+              fill: false
+            };
+          });
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: days,
+              datasets: datasets
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    padding: 15,
+                    font: {
+                      size: 12
+                    }
+                  }
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    precision: 0
+                  }
+                }
+              }
+            }
+          });
+        } catch(e) {
+          console.error('加载攻击趋势失败', e);
+        }
+      };
+      xhr.send();
+    }
+
+    function initAlert() {
+      const alertBar = document.getElementById('alertBar');
+      const closeBtn = document.getElementById('closeAlert');
+      const alertText = document.getElementById('alertText');
+
+      closeBtn.addEventListener('click', () => {
+        alertBar.style.display = 'none';
+      });
+
+      const socket = io();
+      socket.on('attackAlert', function(data) {
+        let msg = `🚨 检测到新的${data.attack_type || ''}攻击尝试，来自 IP: ${data.ip}`;
+        alertText.textContent = msg;
+        alertBar.style.display = 'flex';
+        setTimeout(() => {
+          window.scrollTo({top: 0, behavior: 'smooth'});
+        }, 100);
+      });
+    }
+
+    renderTypeChart();
+    renderTopIps();
+    renderLogs();
+    loadTrendChart();
+    initAlert();
+  </script>
+</body>
+</html>

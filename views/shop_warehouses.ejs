@@ -37,6 +37,7 @@
   <div class="card">
     <h3>➕ 添加仓库</h3>
     <form method="POST" action="/shop/warehouses/add" class="form-row">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input name="name" placeholder="仓库名称（如：上海仓）" required>
       <input name="address" placeholder="地址（选填）">
       <input name="city" list="cityList" placeholder="仓库所在城市" style="flex:1;min-width:140px;padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit" autocomplete="off">
@@ -73,6 +74,7 @@
             <div class="wh-addr"><%= w.address || '未填写地址' %></div>
           </div>
           <form method="POST" action="/shop/warehouses/delete/<%= w.id %>" onsubmit="return confirm('确定删除该仓库？')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-danger">删除</button>
           </form>
         </div>

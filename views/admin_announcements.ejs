@@ -54,6 +54,7 @@ d:\肖宇帆\HTML项目\views\admin_announcements.ejs
     <div class="card">
       <h2>➕ 新建公告</h2>
       <form method="POST" action="/admin/announcements/create">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="form-row">
           <label>公告标题</label>
           <input type="text" name="title" placeholder="例如：系统维护通知" required maxlength="100">
@@ -89,11 +90,13 @@ d:\肖宇帆\HTML项目\views\admin_announcements.ejs
             <td style="color:#6b7280"><%= a.created_at %></td>
             <td style="display:flex;gap:6px">
               <form method="POST" action="/admin/announcements/toggle/<%= a.id %>" style="margin:0">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:none">
                   <%= a.is_active ? '隐藏' : '显示' %>
                 </button>
               </form>
               <form method="POST" action="/admin/announcements/delete/<%= a.id %>" style="margin:0" onsubmit="return confirm('确定删除此公告？')">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button type="submit" class="btn btn-sm btn-danger">删除</button>
               </form>
             </td>

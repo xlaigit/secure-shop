@@ -118,12 +118,14 @@
                   <% if (r.status === 'pending') { %>
                     <div class="form-inline">
                       <form method="POST" action="/admin/refunds/<%= r.id %>/approve" class="form-inline">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                         <input type="text" name="reply" placeholder="回复内容">
                         <button type="submit" class="btn btn-success">✅ 通过</button>
                       </form>
                     </div>
                     <div class="form-inline" style="margin-top:6px;">
                       <form method="POST" action="/admin/refunds/<%= r.id %>/reject" class="form-inline">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                         <input type="text" name="reply" placeholder="驳回理由">
                         <button type="submit" class="btn btn-danger">❌ 驳回</button>
                       </form>

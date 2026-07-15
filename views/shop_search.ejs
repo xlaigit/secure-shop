@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安全练习商城 · 搜索商品</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:10}
+    .nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .nav .brand-icon{width:36px;height:36px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .nav .brand-icon svg{width:18px;height:18px;color:white}
+    .nav .menu{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+    .nav .menu a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .nav .menu a:hover{background:#f3f4f6;color:#667eea}
+    .nav .menu a.active{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .nav .menu a.danger{color:#dc2626}
+    .nav .menu a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1200px;margin:0 auto;padding:24px 28px}
+    .user-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border-radius:18px;padding:22px 26px;margin-bottom:24px;box-shadow:0 10px 30px rgba(102,126,234,0.25);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+    .user-card .info h2{font-size:20px;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px}
+    .user-card .info p{font-size:13px;color:rgba(255,255,255,0.85);opacity:0.9}
+    .user-card .balance{background:rgba(255,255,255,0.18);padding:12px 22px;border-radius:14px;text-align:center;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2)}
+    .user-card .balance .label{font-size:11.5px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;font-weight:500}
+    .user-card .balance .amount{font-size:26px;font-weight:700;margin-top:2px;letter-spacing:-0.5px}
+    .shop-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600;margin-top:10px}
+    .shop-badge.has{background:rgba(16,185,129,0.25);color:#d1fae5;border:1px solid rgba(16,185,129,0.35)}
+    .shop-badge.none{background:rgba(245,158,11,0.25);color:#fed7aa;border:1px solid rgba(245,158,11,0.35)}
+    .shop-badge.none a{color:#fde68a;font-weight:700;text-decoration:none}
+    .shop-badge.none a:hover{text-decoration:underline}
+    .section-header{display:flex;justify-content:space-between;align-items:baseline;margin:8px 0 16px}
+    .section-header h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+    .section-header p{color:#6b7280;font-size:13px;margin-top:4px}
+    .section-header .count{background:#f3f4f6;color:#4b5563;padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+    .product{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border:2px solid transparent;display:flex;flex-direction:column}
+    .product:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,0.1);border-color:#e5e7eb}
+    .product .cat{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:600;margin-bottom:12px}
+    .product .cat.official{background:#dbeafe;color:#1e40af}
+    .product .cat.shop{background:#d1fae5;color:#065f46}
+    .product h3{font-size:17px;font-weight:700;margin-bottom:4px;color:#111827;letter-spacing:-0.2px;line-height:1.4}
+    .product .source{font-size:12.5px;color:#6b7280;margin-bottom:10px}
+    .product .source strong{color:#374151}
+    .product .price{font-size:24px;font-weight:700;color:#667eea;margin-bottom:10px;letter-spacing:-0.5px}
+    .product .price::before{content:'¥';font-size:16px;font-weight:600;margin-right:2px}
+    .rating{font-size:13px;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .rating .stars{color:#f59e0b;letter-spacing:1px}
+    .rating .count{color:#9ca3af;font-size:12px}
+    .actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #f3f4f6}
+    .btn{padding:9px 14px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;flex:1;justify-content:center}
+    .btn-buy{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .btn-buy:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(102,126,234,0.35)}
+    .btn-review{background:#f3f4f6;color:#374151}
+    .btn-review:hover{background:#e5e7eb}
+    .btn-report{background:#fef2f2;color:#dc2626;border:1px solid #fecaca;flex:0 0 auto;padding:9px 12px}
+    .btn-report:hover{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+    .empty{background:white;border-radius:16px;padding:60px 28px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .empty .ico{font-size:48px;margin-bottom:12px;opacity:0.5}
+    .empty h3{font-size:18px;font-weight:600;margin-bottom:8px;color:#1f2937}
+    .empty p{color:#6b7280;font-size:14px}
+    .service-card{background:white;border-radius:16px;padding:22px 26px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;border:2px solid #e5e7eb;transition:all 0.2s}
+    .service-card:hover{border-color:#d1d5db;box-shadow:0 8px 24px rgba(0,0,0,0.08)}
+    .service-card .svc-info{display:flex;align-items:center;gap:16px;flex:1;min-width:200px}
+    .service-card .svc-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+    .service-card .svc-icon.refund{background:linear-gradient(135deg,#fef3c7,#fde68a)}
+    .service-card .svc-icon.bill{background:linear-gradient(135deg,#dbeafe,#bfdbfe)}
+    .service-card .svc-text h3{font-size:16px;font-weight:700;color:#111827;margin-bottom:4px;letter-spacing:-0.2px}
+    .service-card .svc-text p{font-size:13px;color:#6b7280;line-height:1.5}
+    .service-card .svc-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn-svc{padding:10px 20px;border:none;border-radius:12px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+    .btn-svc-refund{background:linear-gradient(135deg,#f59e0b,#d97706);color:white;box-shadow:0 4px 12px rgba(245,158,11,0.3)}
+    .btn-svc-refund:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(245,158,11,0.4)}
+    .btn-svc-bill{background:#f3f4f6;color:#374151;border:2px solid #e5e7eb}
+    .btn-svc-bill:hover{background:#e5e7eb;border-color:#d1d5db;transform:translateY(-1px)}
+    @media (max-width:768px){.nav{padding:12px 16px}.container{padding:18px 16px}.user-card{padding:18px}.user-card .info h2{font-size:17px}.user-card .balance .amount{font-size:22px}}
+
+    /* 搜索区域样式 */
+    .search-section{background:white;border-radius:18px;padding:28px 26px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .search-form{display:flex;gap:12px;max-width:640px;margin:0 auto;align-items:center}
+    .search-form input[type="text"]{flex:1;padding:14px 18px;border:2px solid #e5e7eb;border-radius:12px;font-size:16px;font-family:inherit;outline:none;transition:border-color 0.2s;background:#f9fafb}
+    .search-form input[type="text"]:focus{border-color:#667eea;background:white;box-shadow:0 0 0 3px rgba(102,126,234,0.12)}
+    .search-form .btn-search{padding:14px 28px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;box-shadow:0 4px 12px rgba(102,126,234,0.25);white-space:nowrap}
+    .search-form .btn-search:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(102,126,234,0.35)}
+    .search-empty-hint{text-align:center;color:#9ca3af;font-size:14px;margin-top:16px}
+
+    /* 热搜词标签 */
+    .hot-tags{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px;align-items:center}
+    .hot-tags .label{font-size:12.5px;color:#6b7280;font-weight:500}
+    .hot-tags .tag{padding:5px 14px;border-radius:999px;font-size:12.5px;font-weight:600;background:#f3f4f6;color:#374151;text-decoration:none;transition:all 0.15s}
+    .hot-tags .tag:hover{background:#ede9fe;color:#667eea;transform:translateY(-1px)}
+
+    /* 筛选器区域 */
+    .filter-section{background:white;border-radius:16px;padding:18px 22px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+    .filter-section .filter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .filter-section .filter-group label{font-size:13px;font-weight:600;color:#374151;white-space:nowrap}
+    .filter-section .filter-group input[type="number"]{width:90px;padding:8px 10px;border:2px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:border-color 0.2s;background:#f9fafb}
+    .filter-section .filter-group input[type="number"]:focus{border-color:#667eea;background:white}
+    .filter-section .filter-group select{padding:8px 12px;border:2px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#f9fafb;transition:border-color 0.2s;cursor:pointer}
+    .filter-section .filter-group select:focus{border-color:#667eea;background:white}
+    .filter-section .btn-filter{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:9px 20px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .filter-section .btn-filter:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(102,126,234,0.35)}
+    .filter-section .btn-reset{background:#f3f4f6;color:#374151;border:none;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;text-decoration:none}
+    .filter-section .btn-reset:hover{background:#e5e7eb}
+    .filter-price-sep{color:#9ca3af;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <span>安全练习商城</span>
+    </div>
+    <div class="menu">
+      <a href="/shop">🛒 商城</a>
+      <a href="/orders">📋 订单</a>
+      <a href="/billing">💰 账单</a>
+      <a href="/friends">👥 好友</a>
+      <a href="/chat" style="position:relative">💬 群聊<span id="chatBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/shop/create">🏪 开店</a>
+      <a href="/shop/manage">📦 我的店铺</a>
+      <a href="/cloud">☁️ 文件云盘</a>
+      <a href="/notifications">📨 邮件</a>
+      <a href="/appeal">📝 申诉</a>
+      <a href="/profile">👤 头像</a>
+      <a class="danger" href="/logout">退出</a>
+      <a href="/redeem">兑换</a>
+      <a href="/track">📦 查快递</a>
+      <a href="/prompt-generator">🤖 AI生图</a>
+      <a href="/prompt-generator/gallery">🖼️ 画廊</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="user-card">
+      <div class="info">
+        <h2>👋 你好，<%= user.username %>！</h2>
+        <p>搜索全站商品，快速找到心仪好物</p>
+        <% if (user.shopId) { %>
+          <span class="shop-badge has">🏪 已绑定店铺：<strong><%= user.shopName || '我的店铺' %></strong></span>
+        <% } else { %>
+          <span class="shop-badge none">💡 尚未开店，<a href="/shop/create">立即开通卖家身份 →</a></span>
+        <% } %>
+      </div>
+      <div class="balance">
+        <div class="label">可用余额</div>
+        <div class="amount" id="balance-amount">¥<%= user.balance %></div>
+      </div>
+    </div>
+
+    <div class="search-section">
+      <form class="search-form" action="/shop/search" method="GET">
+        <input type="text" name="q" placeholder="搜索商品名称..." value="<%= query || '' %>" autofocus>
+        <button type="submit" class="btn-search">🔍 搜索</button>
+      </form>
+      <% if (typeof hotKeywords !== 'undefined' && hotKeywords.length > 0) { %>
+        <div class="hot-tags">
+          <span class="label">🔥 热搜：</span>
+          <% for (var i = 0; i < Math.min(5, hotKeywords.length); i++) { %>
+            <a class="tag" href="/shop/search?q=<%= encodeURIComponent(hotKeywords[i]) %>"><%= hotKeywords[i] %></a>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (query && query.trim() !== '') { %>
+      <div class="filter-section">
+        <form action="/shop/search" method="GET" style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;width:100%">
+          <input type="hidden" name="q" value="<%= query %>">
+
+          <div class="filter-group">
+            <label>价格区间</label>
+            <input type="number" name="minPrice" placeholder="最低" value="<%= typeof minPrice !== 'undefined' && minPrice !== null ? minPrice : '' %>" min="0">
+            <span class="filter-price-sep">—</span>
+            <input type="number" name="maxPrice" placeholder="最高" value="<%= typeof maxPrice !== 'undefined' && maxPrice !== null ? maxPrice : '' %>" min="0">
+          </div>
+
+          <div class="filter-group">
+            <label>排序</label>
+            <select name="sort">
+              <option value="default" <%= sort === 'default' || !sort ? 'selected' : '' %>>默认排序</option>
+              <option value="price_asc" <%= sort === 'price_asc' ? 'selected' : '' %>>价格升序</option>
+              <option value="price_desc" <%= sort === 'price_desc' ? 'selected' : '' %>>价格降序</option>
+              <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>最新发布</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-filter">应用筛选</button>
+          <a class="btn-reset" href="/shop/search?q=<%= encodeURIComponent(query) %>">重置</a>
+        </form>
+      </div>
+
+      <div class="section-header">
+        <div>
+          <h1>🔍 搜索结果</h1>
+          <p>关键词：<strong style="color:#667eea">"<%= query %>"</strong></p>
+        </div>
+        <span class="count">共 <%= products.length %> 件</span>
+      </div>
+
+      <% if (products.length === 0) { %>
+        <div class="empty">
+          <div class="ico">🔍</div>
+          <h3>未找到匹配商品</h3>
+          <p>没有找到与 "<%= query %>" 相关的商品，请尝试其他关键词</p>
+        </div>
+      <% } else { %>
+        <div class="grid">
+          <% products.forEach(function(p) { %>
+            <div class="product">
+              <span class="cat <%= p.shop_name ? 'shop' : 'official' %>"><%= p.shop_name ? '🏪 商家商品' : '⭐ 官方推荐' %></span>
+              <h3><%= p.name %></h3>
+              <div class="source">来源：<strong><%= p.shop_name || '官方商城' %></strong></div>
+              <div class="price"><%= p.price %></div>
+              <% const avg = Number(p.avg_rating || 0); const fullStars = Math.round(avg); const emptyStars = 5 - fullStars; %>
+              <div class="rating">
+                <span class="stars"><%= '★'.repeat(fullStars) %><%= '☆'.repeat(emptyStars) %></span>
+                <span class="count">(<%= p.review_count || 0 %> 条评价)</span>
+              </div>
+              <div class="actions">
+                <a class="btn btn-review" href="/review/<%= p.id %>">查看评价</a>
+                <a class="btn btn-report" href="/report?type=product&id=<%= p.id %>&name=<%= encodeURIComponent(p.name) %>" title="举报该商品">🚩</a>
+                <form action="/buy" method="POST" style="flex:1">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="product_id" value="<%= p.id %>">
+                  <input type="text" name="coupon" placeholder="优惠码（选填）" style="width:100%;padding:6px 8px;border:2px solid #e5e7eb;border-radius:8px;font-size:12px;margin-bottom:4px;text-transform:uppercase;">
+                  <button type="submit" class="btn btn-buy" style="width:100%">立即购买</button>
+                </form>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    <% } else { %>
+      <div class="empty">
+        <div class="ico">🔍</div>
+        <h3>请输入关键词搜索商品</h3>
+        <p>在上方搜索框中输入商品名称，我们将为您快速找到相关商品</p>
+      </div>
+    <% } %>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function(){
+    var balanceEl = document.getElementById('balance-amount');
+    var socket = io();
+    socket.on('connect', function(){
+      socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '商品搜索' });
+      socket.emit('getUnread');
+    });
+    socket.on('balanceUpdate', function(nb) { if (balanceEl) balanceEl.textContent = '¥' + nb; });
+    socket.on('unreadUpdate', function(data){
+      var badge = document.getElementById('chatBadge');
+      if (!badge) return;
+      var total = data.privateUnread || 0;
+      if (data.groups) data.groups.forEach(function(g){ total += g.unread || 0; });
+      badge.textContent = total > 99 ? '99+' : total;
+      badge.style.display = total > 0 ? 'inline-block' : 'none';
+    });
+    socket.on('groupUnread', function(){
+      socket.emit('getUnread');
+    });
+  })();
+  </script>
+</body>
+</html>

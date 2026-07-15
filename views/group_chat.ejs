@@ -97,8 +97,13 @@
     function addMsg(data, isSelf) {
       var div = document.createElement('div');
       div.className = 'msg' + (isSelf ? ' self' : '');
-      var initial = (data.from || '?').charAt(0).toUpperCase();
-      div.innerHTML = '<div class="msg-avatar">' + initial + '</div>' +
+      var avatarHtml;
+      if (data.avatar) {
+        avatarHtml = '<img src="' + data.avatar + '">';
+      } else {
+        avatarHtml = (data.from || '?').charAt(0).toUpperCase();
+      }
+      div.innerHTML = '<div class="msg-avatar">' + avatarHtml + '</div>' +
         '<div class="msg-body">' + (isSelf ? '' : '<div class="msg-name">' + data.from + '</div>') +
         '<div class="msg-bubble">' + data.message + '</div>' +
         '<div class="msg-time">' + data.time + '</div></div>';

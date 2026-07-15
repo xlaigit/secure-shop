@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>控制台 · 后台管理</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
@@ -63,7 +64,12 @@
     .notice li{padding:10px 12px;background:#f9fafb;border-radius:10px;margin-bottom:8px;font-size:13px;color:#4b5563;display:flex;justify-content:space-between;align-items:center}
     .notice li:last-child{margin-bottom:0}
     .notice li span.hot{background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
-    @media (max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr}}
+    .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+    .chart-card{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .chart-card h4{font-size:14px;font-weight:600;margin-bottom:12px;color:#374151}
+    .chart-card canvas{width:100%!important;max-height:220px}
+    .stat.attack{border-left-color:#dc2626;background:linear-gradient(135deg,#fff 0%,#fef2f2 100%)}
+    @media (max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -81,8 +87,10 @@
        <span class="text">退款管理</span>
       </a>
       <a href="/admin/flash" class="menu-item">
-       <span class="icon">⚡</span>
-       <span class="text">秒杀管理</span>
+        <span class="icon">⚡</span> 秒杀管理
+      </a>
+      <a href="/admin/promotions" class="menu-item">
+        <span class="icon">🎯</span> 促销管理
       </a>
       <a href="/admin/coupons" class="menu-item">
        <span class="icon">🎫</span>
@@ -115,6 +123,22 @@
       <a href="/admin/orders" class="menu-item">
         <span class="icon">📋</span>
         <span class="text">订单管理</span>
+      </a>
+      <a href="/admin/security" class="menu-item">
+        <span class="icon">🛡️</span>
+        <span class="text">安全监控</span>
+      </a>
+      <a href="/admin/games/seasons" class="menu-item">
+        <span class="icon">🏆</span>
+        <span class="text">赛季管理</span>
+      </a>
+      <a href="/admin/games/announcements" class="menu-item">
+        <span class="icon">📢</span>
+        <span class="text">游戏公告</span>
+      </a>
+      <a href="/admin/games/rooms" class="menu-item">
+        <span class="icon">🎮</span>
+        <span class="text">房间管理</span>
       </a>
       <a href="/chat" class="menu-item">
         <span class="icon">💬</span>
@@ -163,6 +187,11 @@
         <div class="label">当前在线</div>
         <div class="num" id="admin-online-count">--</div>
       </div>
+      <div class="stat attack">
+        <span class="ico">🛡️</span>
+        <div class="label">今日攻击拦截</div>
+        <div class="num" id="attack-count">--</div>
+      </div>
       <div class="stat" style="border-left-color:#06b6d4;background:linear-gradient(135deg,#fff 0%,#ecfeff 100%)">
         <span class="ico">👁</span>
         <div class="label">今日 UV</div>
@@ -173,6 +202,16 @@
         <div class="label">今日 PV</div>
         <div class="num"><%= todayPV %></div>
       </div>
+      <a href="/admin/games/rooms" class="stat" style="border-left-color:#f59e0b;background:linear-gradient(135deg,#fff 0%,#fffbeb 100%)">
+        <span class="ico">🎮</span>
+        <div class="label">进行中游戏</div>
+        <div class="num"><%= gameRoomsActive %></div>
+      </a>
+      <a href="/admin/games/rooms" class="stat" style="border-left-color:#3b82f6;background:linear-gradient(135deg,#fff 0%,#eff6ff 100%)">
+        <span class="ico">⏳</span>
+        <div class="label">等待中房间</div>
+        <div class="num"><%= gameRoomsWaiting %></div>
+      </a>
     </div>
 
     <div class="section-title">📊 最近 7 天趋势</div>
@@ -188,6 +227,26 @@
           <tr><td colspan="4" style="padding:16px;text-align:center;color:#9ca3af">加载中...</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="section-title">📈 数据可视化</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h4>销售额趋势</h4>
+        <canvas id="revenueChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>用户增长曲线</h4>
+        <canvas id="userChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>订单数量趋势</h4>
+        <canvas id="orderChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>7天访问量趋势</h4>
+        <canvas id="visitChart"></canvas>
+      </div>
     </div>
 
     <div class="section-title">功能快捷入口</div>
@@ -263,6 +322,24 @@
         <h3>AI 作品审核</h3>
         <p>审核用户发布的 AI 生成作品</p>
         <span class="tag">进入作品审核 →</span>
+      </a>
+      <a href="/admin/games/seasons" class="card" style="background:linear-gradient(135deg,#fff 0%,#fefce8 100%)">
+        <div class="ico" style="background:linear-gradient(135deg,#f59e0b,#d97706)">🏆</div>
+        <h3>赛季管理</h3>
+        <p>管理游戏赛季、段位积分规则和排行榜</p>
+        <span class="tag">进入赛季管理 →</span>
+      </a>
+      <a href="/admin/games/announcements" class="card" style="background:linear-gradient(135deg,#fff 0%,#f0fdf4 100%)">
+        <div class="ico" style="background:linear-gradient(135deg,#10b981,#059669)">📢</div>
+        <h3>游戏公告</h3>
+        <p>发布游戏维护通知、活动公告和版本更新</p>
+        <span class="tag">进入游戏公告 →</span>
+      </a>
+      <a href="/admin/games/rooms" class="card" style="background:linear-gradient(135deg,#fff 0%,#faf5ff 100%)">
+        <div class="ico" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">🎮</div>
+        <h3>房间管理</h3>
+        <p>查看和管理所有游戏房间（共 <%= gameRoomsTotal %> 个）</p>
+        <span class="tag">进入房间管理 →</span>
       </a>
     </div>
     <div class="section-title">🟢 在线用户</div>
@@ -340,5 +417,78 @@
     loadTrend();
   })();
   </script>
+  <script>
+  (function(){
+    var chartsInitialized = false;
+    function initCharts() {
+      if (chartsInitialized) return;
+      chartsInitialized = true;
+      fetch('/api/admin/chart-data?days=7')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          var labels = (data.orders || []).map(function(o){ return o.d; });
+          var orderVals = (data.orders || []).map(function(o){ return o.orders; });
+          var revenueVals = (data.orders || []).map(function(o){ return o.revenue; });
+          var userVals = (data.users || []).map(function(u){ return u.users; });
+          var visitVals = (data.visits || []).map(function(v){ return v.visits; });
+          new Chart(document.getElementById('revenueChart'), {
+            type: 'line',
+            data: { labels: labels, datasets: [{ label: '销售额 (元)', data: revenueVals, borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          });
+          new Chart(document.getElementById('userChart'), {
+            type: 'line',
+            data: { labels: labels, datasets: [{ label: '新增用户', data: userVals, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          });
+          new Chart(document.getElementById('orderChart'), {
+            type: 'line',
+            data: { labels: labels, datasets: [{ label: '订单数', data: orderVals, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          });
+          new Chart(document.getElementById('visitChart'), {
+            type: 'line',
+            data: { labels: labels, datasets: [{ label: '访问量', data: visitVals, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          });
+        })
+        .catch(function(e){ console.error('Chart data load error', e); });
+    }
+    function loadAttackStats() {
+      fetch('/api/admin/attack-stats?days=1')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          document.getElementById('attack-count').textContent = data.count || 0;
+        })
+        .catch(function(e){ console.error('Attack stats load error', e); });
+    }
+    loadAttackStats();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCharts);
+    } else {
+      initCharts();
+    }
+    // 实时攻击告警和通知
+    socket.on('attackAlert', function(data) {
+      var atkEl = document.getElementById('attack-count');
+      if (atkEl) atkEl.textContent = parseInt(atkEl.textContent || 0) + 1;
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s';
+      toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px">🛡️ 检测到攻击</div><div style="font-size:12px;opacity:0.9">' + (data.atk || '未知') + ' 来自 ' + data.ip + '</div>';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 4000);
+    });
+    socket.on('newNotification', function(data) {
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:80px;right:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s';
+      toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px">' + data.title + '</div><div style="font-size:12px;opacity:0.9">' + data.content + '</div>';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 4000);
+    });
+  })();
+  </script>
+  <style>
+    @keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}
+  </style>
 </body>
 </html>

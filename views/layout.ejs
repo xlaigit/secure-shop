@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>安全练习商城</title>
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <div style="margin-bottom:10px">
     <% if (user) { %>
       欢迎，<%= user.username %> | 余额：<%= user.balance %> 元 | 信誉分：<%= user.reputation || 100 %>
-      | <a href="/shop">商城</a> | <a href="/orders">订单</a> | <a href="/billing">账单</a> | <a href="/profile">头像</a> | <a href="/friends">好友</a> | <a href="/chat">群聊</a> | <a href="/shop/create">开店</a> | <a href="/shop/manage">我的店铺</a> | <a href="/prompt-generator">🤖AI生图</a> | <a href="/logout">注销</a>| <a href="/redeem">兑换</a> |
+      | <a href="/shop">商城</a> | <a href="/orders">订单</a> | <a href="/billing">账单</a> | <a href="/friends">好友</a> | <a href="/chat">群聊</a> | <a href="/shop/create">开店</a> | <a href="/shop/manage">我的店铺</a> | <a href="/cloud">☁️ 文件云盘</a> | <a href="/notifications" style="position:relative">📨 通知<span id="globalNotifBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700"></span></a> | <a href="/appeal">📝 申诉</a> | <a href="/profile">👤 头像</a> | <a href="/prompt-generator">🤖AI生图</a> | <a href="/logout">注销</a>| <a href="/redeem">兑换</a> |
       <% if (user.warningActive) { %>
         <div style="margin-top:8px;padding:6px 10px;border:1px solid #f59e0b;background:#fff7ed;color:#9a2c00;border-radius:4px;font-size:13px;display:inline-block">⚠️ 你当前处于警告期，店铺评价暂时不可用，直到 <%= user.warningUntil %>。</div>
       <% } %>
@@ -18,5 +19,35 @@
   </div>
   <hr>
   <%- body %>
+  <% if (user) { %>
+  <script>
+  (function(){
+    var socket = io();
+    socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>' });
+    socket.on('newNotification', function(data) {
+      var badge = document.getElementById('globalNotifBadge');
+      if (!badge) return;
+      var cur = parseInt(badge.textContent) || 0;
+      badge.textContent = cur >= 99 ? '99+' : (cur + 1);
+      badge.style.display = 'inline-block';
+      // 显示通知弹窗
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s';
+      toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px">' + data.title + '</div><div style="font-size:12px;opacity:0.9">' + data.content + '</div>';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 4000);
+    });
+    socket.on('notifUnreadUpdate', function(data) {
+      var badge = document.getElementById('globalNotifBadge');
+      if (!badge) return;
+      if (data.count <= 0) { badge.style.display = 'none'; return; }
+      badge.textContent = data.count >= 99 ? '99+' : data.count;
+      badge.style.display = 'inline-block';
+    });
+    socket.emit('getNotifUnread');
+  })();
+  </script>
+  <style>@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}</style>
+  <% } %>
 </body>
 </html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎫 优惠券中心 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(150deg,#f0f4ff 0%,#faf0ff 40%,#fef7ed 100%);min-height:100vh;color:#1f2937}
+
+    /* ===== 导航栏 ===== */
+    .nav{background:rgba(255,255,255,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:12px 28px;box-shadow:0 1px 8px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:50;border-bottom:1px solid rgba(255,255,255,0.5)}
+    .nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:-0.3px;color:#1f2937}
+    .nav .brand-icon{width:34px;height:34px;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(99,102,241,0.3)}
+    .nav .brand-icon svg{width:18px;height:18px;color:white}
+    .nav .menu{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+    .nav .menu a{padding:7px 12px;text-decoration:none;color:#4b5563;border-radius:8px;font-size:13px;font-weight:500;transition:all 0.2s}
+    .nav .menu a:hover{background:#f3f4f6;color:#6366f1}
+    .nav .menu a.active{background:linear-gradient(135deg,#6366f1,#a855f7);color:white;box-shadow:0 2px 8px rgba(99,102,241,0.3)}
+
+    .container{max-width:1280px;margin:0 auto;padding:20px 24px}
+
+    /* ===== 页面标题 ===== */
+    .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+    .page-header h1{font-size:24px;font-weight:700;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;color:#111827}
+    .page-header .sub{font-size:13px;color:#6b7280;font-weight:500}
+
+    /* ===== Tab 切换 ===== */
+    .tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(255,255,255,0.7);backdrop-filter:blur(12px);border-radius:14px;padding:4px;border:1px solid rgba(255,255,255,0.6);box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+    .tabs .tab{padding:10px 24px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.25s;background:transparent;color:#6b7280;font-family:inherit}
+    .tabs .tab:hover{background:#f3f4f6;color:#374151}
+    .tabs .tab.active{background:linear-gradient(135deg,#6366f1,#a855f7);color:white;box-shadow:0 2px 8px rgba(99,102,241,0.25)}
+    .tab-content{display:none}
+    .tab-content.active{display:block;animation:fadeUp 0.3s ease}
+
+    @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+    /* ===== 优惠券卡片 ===== */
+    .coupon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+    .coupon-card{background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);transition:all 0.25s;border:1px solid #f3f4f6;display:flex;flex-direction:column}
+    .coupon-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,0.1);border-color:#e5e7eb}
+    .coupon-card .coupon-top{background:linear-gradient(135deg,#6366f1,#a855f7);padding:16px 20px;color:white;position:relative;overflow:hidden}
+    .coupon-card .coupon-top::after{content:'';position:absolute;top:-30px;right:-30px;width:100px;height:100px;background:rgba(255,255,255,0.08);border-radius:50%}
+    .coupon-card .coupon-top .coupon-value{font-size:32px;font-weight:800;letter-spacing:-1px}
+    .coupon-card .coupon-top .coupon-value .unit{font-size:16px;font-weight:600;margin-left:2px}
+    .coupon-card .coupon-top .coupon-condition{font-size:12px;opacity:0.85;margin-top:4px}
+    .coupon-card .coupon-body{padding:14px 20px;flex:1;display:flex;flex-direction:column}
+    .coupon-card .coupon-body .coupon-name{font-size:14px;font-weight:600;color:#111827;margin-bottom:6px}
+    .coupon-card .coupon-body .coupon-desc{font-size:12px;color:#6b7280;margin-bottom:8px;line-height:1.5}
+    .coupon-card .coupon-body .coupon-expiry{font-size:11px;color:#9ca3af;margin-bottom:10px;display:flex;align-items:center;gap:4px}
+    .coupon-card .coupon-body .coupon-actions{margin-top:auto}
+    .coupon-card .coupon-body .btn-claim{width:100%;padding:10px;background:linear-gradient(135deg,#6366f1,#a855f7);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:inherit}
+    .coupon-card .coupon-body .btn-claim:hover{opacity:0.9;transform:translateY(-1px)}
+    .coupon-card .coupon-body .btn-claim:disabled{background:#d1d5db;cursor:not-allowed;transform:none;opacity:1}
+    .coupon-card .coupon-body .btn-claim.claimed{background:#10b981}
+
+    /* ===== 我的优惠券 ===== */
+    .my-coupon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+    .my-coupon-card{background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);transition:all 0.25s;border:1px solid #f3f4f6}
+    .my-coupon-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,0.1);border-color:#e5e7eb}
+    .my-coupon-card .mc-top{background:linear-gradient(135deg,#10b981,#059669);padding:14px 20px;color:white;position:relative}
+    .my-coupon-card .mc-top.used{background:linear-gradient(135deg,#9ca3af,#6b7280)}
+    .my-coupon-card .mc-top.expired{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    .my-coupon-card .mc-top .mc-value{font-size:28px;font-weight:800;letter-spacing:-1px}
+    .my-coupon-card .mc-top .mc-value .unit{font-size:14px;font-weight:600}
+    .my-coupon-card .mc-top .mc-status{position:absolute;top:10px;right:14px;font-size:11px;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,0.2);font-weight:600}
+    .my-coupon-card .mc-body{padding:14px 20px}
+    .my-coupon-card .mc-body .mc-name{font-size:13px;font-weight:600;color:#111827;margin-bottom:4px}
+    .my-coupon-card .mc-body .mc-condition{font-size:12px;color:#6b7280;margin-bottom:4px}
+    .my-coupon-card .mc-body .mc-expiry{font-size:11px;color:#9ca3af}
+
+    .loading{text-align:center;padding:60px 20px;color:#6b7280;font-size:14px;background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+    .empty-state{text-align:center;padding:60px 20px;background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+    .empty-state .ico{font-size:48px;margin-bottom:12px;opacity:0.5}
+    .empty-state h3{font-size:18px;font-weight:600;margin-bottom:8px;color:#1f2937}
+    .empty-state p{color:#6b7280;font-size:14px}
+
+    @media (max-width:768px){.nav{padding:10px 16px}.container{padding:14px 12px}.page-header h1{font-size:20px}.coupon-grid,.my-coupon-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <span>安全练习商城</span>
+    </div>
+    <div class="menu">
+      <a href="/shop">🛒 商城</a>
+      <a href="/cart" style="position:relative">🛍️ 购物车<span id="navCartBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/wishlist">⭐ 收藏</a>
+      <a href="/coupons" class="active">🎫 优惠券</a>
+      <a href="/referral">🤝 邀请好友</a>
+      <a href="/promotions">🎉 促销活动</a>
+      <a href="/orders">📋 订单</a>
+      <a href="/billing">💰 账单</a>
+      <a href="/friends">👥 好友</a>
+      <a href="/chat" style="position:relative">💬 群聊<span id="chatBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/shop/create">🏪 开店</a>
+      <a href="/shop/manage">📦 我的店铺</a>
+      <a href="/cloud">☁️ 文件云盘</a>
+      <a href="/notifications" style="position:relative">📨 通知<span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/appeal">📝 申诉</a>
+      <a href="/profile">👤 头像</a>
+      <a href="/logout">退出</a>
+      <a href="/redeem">兑换</a>
+      <a href="/track">📦 查快递</a>
+      <a href="/prompt-generator">🤖 AI生图</a>
+      <a href="/prompt-generator/gallery">🖼️ 画廊</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>🎫 优惠券中心</h1>
+      <span class="sub">领取优惠券，享受更多优惠</span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="available">📥 可领取优惠券</button>
+      <button class="tab" data-tab="mine">🎁 我的优惠券</button>
+    </div>
+
+    <div class="tab-content active" id="tab-available">
+      <div id="availableCoupons">
+        <div class="loading">⏳ 加载优惠券中...</div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-mine">
+      <div id="myCoupons">
+        <div class="loading">⏳ 加载我的优惠券中...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function() {
+    var csrfToken = '<%= csrfToken %>';
+    var socket = io();
+
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+        document.querySelectorAll('.tab-content').forEach(function(tc){ tc.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+      });
+    });
+
+    // 加载可领取优惠券
+    function loadAvailableCoupons() {
+      var container = document.getElementById('availableCoupons');
+      fetch('/api/coupons')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="ico">🎫</div><h3>暂无可用优惠券</h3><p>当前没有可领取的优惠券，请稍后再来</p></div>';
+            return;
+          }
+          var html = '<div class="coupon-grid">';
+          data.forEach(function(c) {
+            var conditionText = c.min_amount ? '满 ¥' + c.min_amount + ' 可用' : '无门槛';
+            var expiryText = c.end_time ? '有效期至：' + new Date(c.end_time).toLocaleDateString('zh-CN') : '长期有效';
+            html += '<div class="coupon-card" data-id="' + c.id + '">' +
+              '<div class="coupon-top">' +
+                '<div class="coupon-value">' + c.value + '<span class="unit">元</span></div>' +
+                '<div class="coupon-condition">' + conditionText + '</div>' +
+              '</div>' +
+              '<div class="coupon-body">' +
+                '<div class="coupon-name">' + (c.name || '优惠券') + '</div>' +
+                '<div class="coupon-desc">' + (c.description || '') + '</div>' +
+                '<div class="coupon-expiry">📅 ' + expiryText + '</div>' +
+                '<div class="coupon-actions">' +
+                  '<button class="btn-claim" data-cid="' + c.id + '" onclick="claimCoupon(' + c.id + ')">📥 立即领取</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+          container.innerHTML = html;
+        })
+        .catch(function() {
+          container.innerHTML = '<div class="empty-state"><div class="ico">⚠️</div><h3>加载失败</h3><p>无法加载优惠券数据，请稍后重试</p></div>';
+        });
+    }
+
+    // 领取优惠券
+    window.claimCoupon = function(couponId) {
+      var btn = document.querySelector('.btn-claim[data-cid="' + couponId + '"]');
+      if (btn && btn.disabled) return;
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ 领取中...'; }
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/coupons/claim');
+      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      xhr.onload = function() {
+        var res = JSON.parse(xhr.responseText);
+        if (res.ok) {
+          if (btn) { btn.textContent = '✅ 已领取'; btn.classList.add('claimed'); }
+          showToast('🎉 优惠券领取成功！', 'success');
+          loadMyCoupons();
+        } else {
+          if (btn) { btn.disabled = false; btn.textContent = '📥 立即领取'; }
+          showToast(res.msg || '领取失败', 'error');
+        }
+      };
+      xhr.onerror = function() {
+        if (btn) { btn.disabled = false; btn.textContent = '📥 立即领取'; }
+        showToast('网络错误，请重试', 'error');
+      };
+      xhr.send('coupon_id=' + couponId + '&_csrf=' + encodeURIComponent(csrfToken));
+    };
+
+    // 加载我的优惠券
+    function loadMyCoupons() {
+      var container = document.getElementById('myCoupons');
+      fetch('/api/user/coupons')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="ico">🎁</div><h3>暂无优惠券</h3><p>快去领取优惠券吧！</p></div>';
+            return;
+          }
+          var html = '<div class="my-coupon-grid">';
+          data.forEach(function(c) {
+            var statusClass = '';
+            var statusText = '';
+            if (c.status === 'used') { statusClass = 'used'; statusText = '已使用'; }
+            else if (c.status === 'expired') { statusClass = 'expired'; statusText = '已过期'; }
+            else { statusText = '可使用'; }
+            var conditionText = c.min_amount ? '满 ¥' + c.min_amount + ' 可用' : '无门槛';
+            var expiryText = c.end_time ? '有效期至：' + new Date(c.end_time).toLocaleDateString('zh-CN') : '长期有效';
+            html += '<div class="my-coupon-card">' +
+              '<div class="mc-top ' + statusClass + '">' +
+                '<div class="mc-value">' + c.value + '<span class="unit">元</span></div>' +
+                '<span class="mc-status">' + statusText + '</span>' +
+              '</div>' +
+              '<div class="mc-body">' +
+                '<div class="mc-name">' + (c.name || '优惠券') + '</div>' +
+                '<div class="mc-condition">' + conditionText + '</div>' +
+                '<div class="mc-expiry">📅 ' + expiryText + '</div>' +
+              '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+          container.innerHTML = html;
+        })
+        .catch(function() {
+          container.innerHTML = '<div class="empty-state"><div class="ico">⚠️</div><h3>加载失败</h3><p>无法加载优惠券数据，请稍后重试</p></div>';
+        });
+    }
+
+    function showToast(msg, type) {
+      var bg = type === 'success' ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#ef4444,#dc2626)';
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:20px;right:20px;' + bg + ';color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 2500);
+    }
+
+    // 购物车数量
+    function updateCartBadge(count) {
+      var badge = document.getElementById('navCartBadge');
+      if (!badge) return;
+      if (!count || count <= 0) { badge.style.display = 'none'; return; }
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = 'inline-block';
+    }
+    fetch('/api/cart/count').then(function(r){ return r.json(); }).then(function(data) {
+      updateCartBadge(data.count);
+    }).catch(function(){});
+
+    // Socket.IO 连接
+    socket.on('connect', function() {
+      socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '优惠券中心' });
+    });
+
+    // 初始化
+    loadAvailableCoupons();
+    loadMyCoupons();
+  })();
+  </script>
+  <style>
+    @keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  </style>
+</body>
+</html>

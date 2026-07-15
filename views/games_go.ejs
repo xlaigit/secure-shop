@@ -1,0 +1,2896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="<%= csrfToken %>">
+  <title>围棋 - 游戏中心</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0b0e17;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #121926; }
+    ::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a4a6c; }
+
+    /* ========== NAVBAR ========== */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 64px;
+      background: rgba(11, 14, 23, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 215, 0, 0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar .nav-left { display: flex; align-items: center; gap: 8px; }
+    .navbar .nav-logo {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffd700, #f0a500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-right: 24px;
+    }
+    .navbar .nav-links { display: flex; gap: 4px; }
+    .navbar .nav-links a {
+      color: #8899bb;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.25s;
+    }
+    .navbar .nav-links a:hover,
+    .navbar .nav-links a.active { background: rgba(255, 215, 0, 0.1); color: #ffd700; }
+    .navbar .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .navbar .nav-user .balance {
+      background: rgba(255, 215, 0, 0.12);
+      border: 1px solid rgba(255, 215, 0, 0.25);
+      padding: 6px 16px;
+      border-radius: 20px;
+      color: #ffd700;
+      font-weight: 600;
+    }
+    .navbar .nav-user .avatar-small {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      object-fit: cover;
+    }
+
+    /* ========== MAIN LAYOUT ========== */
+    .app-container {
+      display: flex;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 20px 24px;
+      gap: 24px;
+      min-height: calc(100vh - 64px);
+    }
+    .game-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .game-sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ========== GLASS CARD ========== */
+    .glass-card {
+      background: rgba(18, 25, 38, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    /* ========== BOARD ========== */
+    .board-container {
+      position: relative;
+      background: rgba(18, 25, 38, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+    }
+    .board-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    #gameCanvas {
+      display: block;
+      cursor: pointer;
+      border-radius: 8px;
+      background: #d4a45a;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.3);
+    }
+    .board-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #8899bb;
+    }
+    .board-info .last-move-label { color: #ffd700; }
+
+    /* ========== PLAYER INFO PANELS ========== */
+    .player-panel {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      background: rgba(18, 25, 38, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      transition: all 0.3s;
+    }
+    .player-panel.active-turn {
+      border-color: rgba(255, 215, 0, 0.4);
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.08);
+    }
+    .player-panel .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .player-panel .avatar.black-side { border-color: #333; }
+    .player-panel .avatar.white-side { border-color: #ccc; }
+    .player-panel .player-info { flex: 1; min-width: 0; }
+    .player-panel .player-info .name {
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .player-panel .player-info .captures {
+      font-size: 12px;
+      color: #8899bb;
+      margin-top: 2px;
+    }
+    .player-panel .player-info .captures strong { color: #ffd700; }
+    .player-panel .stone-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .stone-indicator.black { background: radial-gradient(circle at 35% 35%, #555, #111); box-shadow: 1px 1px 3px rgba(0,0,0,0.4); }
+    .stone-indicator.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); box-shadow: 1px 1px 3px rgba(0,0,0,0.2); }
+
+    /* ========== SIDEBAR ========== */
+    .sidebar-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #8899bb;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-section h3 .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      background: rgba(255,215,0,0.1);
+      color: #ffd700;
+    }
+
+    .status-display {
+      text-align: center;
+    }
+    .status-display .turn-label {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .status-display .turn-label.black-turn { color: #e0e0e0; }
+    .status-display .turn-label.white-turn { color: #ffd700; }
+    .status-display .move-count {
+      font-size: 13px;
+      color: #556688;
+    }
+
+    /* Difficulty selector in sidebar */
+    .diff-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .diff-selector .diff-label {
+      font-size: 12px;
+      color: #556688;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .diff-selector .diff-options {
+      display: flex;
+      gap: 6px;
+    }
+    .diff-selector .diff-options .diff-btn {
+      flex: 1;
+      padding: 8px 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      color: #8899bb;
+      cursor: pointer;
+      text-align: center;
+      font-size: 12px;
+      transition: all 0.25s;
+    }
+    .diff-selector .diff-options .diff-btn:hover { border-color: rgba(255,215,0,0.3); color: #c8d6e5; }
+    .diff-selector .diff-options .diff-btn.active {
+      background: rgba(255,215,0,0.1);
+      border-color: #ffd700;
+      color: #ffd700;
+    }
+
+    /* Game Actions */
+    .game-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .game-actions .btn {
+      flex: 1;
+      min-width: 60px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      color: #c8d6e5;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.25s;
+      text-align: center;
+    }
+    .game-actions .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
+    .game-actions .btn.primary-action {
+      background: rgba(255,215,0,0.1);
+      border-color: rgba(255,215,0,0.2);
+      color: #ffd700;
+    }
+    .game-actions .btn.primary-action:hover { background: rgba(255,215,0,0.2); }
+    .game-actions .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    /* Move History */
+    .move-history {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .move-history .move-row {
+      display: flex;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      transition: background 0.15s;
+    }
+    .move-history .move-row:hover { background: rgba(255,255,255,0.04); }
+    .move-history .move-row .move-num {
+      width: 28px;
+      color: #556688;
+    }
+    .move-history .move-row .move-pos {
+      width: 40px;
+      color: #c8d6e5;
+    }
+    .move-history .move-row .move-info {
+      flex: 1;
+      text-align: right;
+      color: #556688;
+      font-size: 11px;
+    }
+    .move-history .move-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+
+    /* ========== AI THINKING ========== */
+    .ai-thinking {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 150;
+      background: rgba(11,14,23,0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,215,0,0.3);
+      border-radius: 16px;
+      padding: 24px 36px;
+      text-align: center;
+      display: none;
+    }
+    .ai-thinking.show { display: block; }
+    .ai-thinking .ai-spinner {
+      width: 36px;
+      height: 36px;
+      margin: 0 auto 12px;
+      border: 3px solid rgba(255,215,0,0.1);
+      border-top: 3px solid #ffd700;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-thinking .ai-text {
+      font-size: 16px;
+      color: #ffd700;
+      letter-spacing: 2px;
+    }
+
+    /* ========== GAME OVER MODAL ========== */
+    .gameover-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(12px);
+      z-index: 300;
+      justify-content: center;
+      align-items: center;
+    }
+    .gameover-modal.show { display: flex; }
+    .gameover-modal .modal-card {
+      background: rgba(18,25,38,0.95);
+      border: 1px solid rgba(255,215,0,0.2);
+      border-radius: 20px;
+      padding: 36px 40px;
+      max-width: 440px;
+      width: 90%;
+      text-align: center;
+      animation: modalIn 0.4s ease-out;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.9) translateY(20px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .gameover-modal .result-icon { font-size: 56px; margin-bottom: 8px; }
+    .gameover-modal .result-title {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .gameover-modal .result-sub {
+      font-size: 14px;
+      color: #8899bb;
+      margin-bottom: 20px;
+    }
+    .gameover-modal .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .gameover-modal .stat-item {
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .gameover-modal .stat-item .label {
+      font-size: 11px;
+      color: #556688;
+      text-transform: uppercase;
+    }
+    .gameover-modal .stat-item .value {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .gameover-modal .stat-item .value.positive { color: #4ecdc4; }
+    .gameover-modal .modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .gameover-modal .modal-actions .btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    /* ========== TOAST ========== */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 10px;
+      background: rgba(11,14,23,0.92);
+      border: 1px solid rgba(255,215,0,0.2);
+      color: #e0e0e0;
+      font-size: 14px;
+      z-index: 500;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 1100px) {
+      .app-container { flex-direction: column; align-items: center; }
+      .game-sidebar { width: 100%; max-width: 600px; flex-direction: row; flex-wrap: wrap; }
+      .game-sidebar .glass-card { flex: 1; min-width: 200px; }
+    }
+    @media (max-width: 600px) {
+      .navbar { padding: 0 16px; }
+      .navbar .nav-links a { padding: 6px 10px; font-size: 12px; }
+      .board-container { padding: 12px; }
+      .player-panel { padding: 10px 12px; }
+    }
+
+    /* ========== MATCH LOBBY ========== */
+    .match-lobby-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 660px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .match-lobby-bar .mode-btn {
+      padding: 8px 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.03);
+      color: #8899bb;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.25s;
+      white-space: nowrap;
+    }
+    .match-lobby-bar .mode-btn:hover {
+      border-color: rgba(255,215,0,0.3);
+      color: #c8d6e5;
+    }
+    .match-lobby-bar .mode-btn.active {
+      background: rgba(255,215,0,0.1);
+      border-color: #ffd700;
+      color: #ffd700;
+    }
+    .match-lobby-bar .mode-btn.online-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .match-lobby-bar .mode-btn .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .match-lobby-bar .mode-btn .dot.online { background: #4ecdc4; }
+    .match-lobby-bar .mode-btn .dot.offline { background: #556688; }
+    .match-lobby-bar .lobby-status {
+      font-size: 12px;
+      color: #556688;
+      margin-left: auto;
+    }
+
+    /* ========== MATCH MODAL ========== */
+    .match-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(12px);
+      z-index: 400;
+      justify-content: center;
+      align-items: center;
+    }
+    .match-modal.show { display: flex; }
+    .match-modal .modal-card {
+      background: rgba(18,25,38,0.95);
+      border: 1px solid rgba(255,215,0,0.2);
+      border-radius: 20px;
+      padding: 32px 36px;
+      max-width: 480px;
+      width: 90%;
+      animation: modalIn 0.4s ease-out;
+    }
+    .match-modal .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 20px;
+      color: #e0e0e0;
+    }
+    .match-modal .match-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .match-modal .match-options .option-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .match-modal .match-options .option-row label {
+      font-size: 14px;
+      color: #8899bb;
+      min-width: 80px;
+    }
+    .match-modal .match-options .option-row select,
+    .match-modal .match-options .option-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      color: #e0e0e0;
+      font-size: 14px;
+      outline: none;
+    }
+    .match-modal .match-options .option-row select option {
+      background: #1a2332;
+      color: #e0e0e0;
+    }
+    .match-modal .match-options .option-row input::placeholder {
+      color: #556688;
+    }
+    .match-modal .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .match-modal .modal-actions .btn {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s;
+      text-align: center;
+    }
+    .match-modal .modal-actions .btn.btn-primary {
+      background: linear-gradient(135deg, #ffd700, #f0a500);
+      color: #1a1a2e;
+    }
+    .match-modal .modal-actions .btn.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(255,215,0,0.3); }
+    .match-modal .modal-actions .btn.btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: #c8d6e5;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .match-modal .modal-actions .btn.btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .match-modal .modal-actions .btn.btn-danger {
+      background: rgba(255,50,50,0.15);
+      color: #ff6b6b;
+      border: 1px solid rgba(255,50,50,0.2);
+    }
+    .match-modal .modal-actions .btn.btn-danger:hover { background: rgba(255,50,50,0.25); }
+    .match-modal .modal-actions .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    /* ========== MATCH WAITING ========== */
+    .match-waiting {
+      text-align: center;
+      padding: 20px 0;
+    }
+    .match-waiting .waiting-spinner {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .match-waiting .waiting-spinner .dot-pulse {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ffd700;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .match-waiting .waiting-spinner .dot-pulse:nth-child(2) { animation-delay: 0.2s; }
+    .match-waiting .waiting-spinner .dot-pulse:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse {
+      0%, 80%, 100% { transform: scale(0.5); opacity: 0.3; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    .match-waiting .waiting-text {
+      font-size: 16px;
+      color: #ffd700;
+      margin-bottom: 8px;
+    }
+    .match-waiting .waiting-sub {
+      font-size: 13px;
+      color: #556688;
+    }
+
+    /* ========== TIER BADGE ========== */
+    .tier-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .tier-badge .tier-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ========== RATING INFO ========== */
+    .rating-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .rating-info .rating-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .rating-info .rating-row .label {
+      color: #556688;
+    }
+    .rating-info .rating-row .value {
+      color: #c8d6e5;
+      font-weight: 600;
+    }
+    .rating-info .rating-row .value.positive { color: #4ecdc4; }
+    .rating-info .rating-row .value.negative { color: #ff6b6b; }
+    .rating-info .rating-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin: 4px 0;
+    }
+
+    /* ========== ONLINE PLAYER INFO ========== */
+    .opponent-info {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: rgba(255,215,0,0.05);
+      border: 1px solid rgba(255,215,0,0.15);
+      border-radius: 10px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .opponent-info.show { display: flex; }
+    .opponent-info .opponent-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,215,0,0.3);
+      object-fit: cover;
+    }
+    .opponent-info .opponent-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .opponent-info .opponent-details .opponent-name {
+      font-weight: 600;
+      color: #e0e0e0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .opponent-info .opponent-details .opponent-tier {
+      font-size: 11px;
+      color: #8899bb;
+    }
+
+    /* ========== ROOM INFO BAR ========== */
+    .room-info-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 660px;
+      margin-bottom: 16px;
+      padding: 10px 16px;
+      background: rgba(78, 205, 196, 0.08);
+      border: 1px solid rgba(78, 205, 196, 0.2);
+      border-radius: 10px;
+      font-size: 13px;
+    }
+    .room-info-bar.show { display: flex; }
+    .room-info-bar .room-id-label {
+      color: #4ecdc4;
+      font-weight: 600;
+    }
+    .room-info-bar .room-id-value {
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+    }
+    .room-info-bar .room-status {
+      margin-left: auto;
+      color: #8899bb;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========== NAVBAR ========== -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <div class="nav-logo">♟ 棋牌</div>
+      <div class="nav-links">
+        <a href="/games">游戏中心</a>
+        <a href="/games/chess">国际象棋</a>
+        <a href="/games/gomoku">五子棋</a>
+        <a href="/games/go" class="active">围棋</a>
+        <a href="/games/draw">你画我猜</a>
+        <a href="/games/fps">射击</a>
+      </div>
+    </div>
+    <div class="nav-user">
+      <span class="balance">💰 <span id="balanceDisplay"><%= typeof user !== 'undefined' && user.balance ? user.balance.toFixed(2) : '0.00' %></span> 金币</span>
+      <img class="avatar-small" src="<%= typeof user !== 'undefined' && user.avatar ? user.avatar : '/images/default-avatar.png' %>" alt="avatar">
+    </div>
+  </nav>
+
+  <!-- ========== MATCH LOBBY BAR ========== -->
+  <div class="match-lobby-bar" style="max-width:1440px;margin:0 auto;padding:10px 24px 0;">
+    <button class="mode-btn active" onclick="switchMode('ai', this)">
+      <span>🤖 AI 对战</span>
+    </button>
+    <button class="mode-btn online-indicator" onclick="openMatchModal()">
+      <span class="dot online" id="connectionDot"></span>
+      <span>🔍 联机匹配</span>
+    </button>
+    <button class="mode-btn" onclick="openCreateRoomModal()">
+      <span>🏠 创建房间</span>
+    </button>
+    <button class="mode-btn" onclick="openJoinRoomModal()">
+      <span>🚪 加入房间</span>
+    </button>
+    <span class="lobby-status" id="lobbyStatus"></span>
+  </div>
+
+  <!-- ========== ROOM INFO BAR ========== -->
+  <div class="room-info-bar" id="roomInfoBar">
+    <span class="room-id-label">🏠 房间</span>
+    <span class="room-id-value" id="roomIdDisplay">—</span>
+    <span class="room-status" id="roomStatusText">等待中...</span>
+  </div>
+
+  <!-- ========== APP CONTAINER ========== -->
+  <div class="app-container">
+
+    <!-- ===== MAIN ===== -->
+    <div class="game-main">
+
+      <!-- Player Panels -->
+      <div style="display:flex; gap:16px; width:100%; max-width:660px; margin-bottom:16px; align-items:stretch;">
+        <div class="player-panel" id="playerBlackPanel" style="flex:1;">
+          <div class="stone-indicator black"></div>
+          <img class="avatar black-side" id="blackAvatar" src="/images/default-avatar.png" alt="">
+          <div class="player-info">
+            <div class="name" id="blackName">黑棋 (你)</div>
+            <div class="captures">提子: <strong id="blackCaptures">0</strong></div>
+          </div>
+        </div>
+        <div class="player-panel" id="playerWhitePanel" style="flex:1;">
+          <div class="stone-indicator white"></div>
+          <img class="avatar white-side" id="whiteAvatar" src="/images/default-avatar.png" alt="">
+          <div class="player-info">
+            <div class="name" id="whiteName">白棋 (AI)</div>
+            <div class="captures">提子: <strong id="whiteCaptures">0</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Opponent Info (Online Mode) -->
+      <div class="opponent-info" id="opponentInfo">
+        <img class="opponent-avatar" id="opponentAvatar" src="/images/default-avatar.png" alt="">
+        <div class="opponent-details">
+          <div class="opponent-name" id="opponentName">对手</div>
+          <div class="opponent-tier" id="opponentTier">段位获取中...</div>
+        </div>
+      </div>
+
+      <!-- Board -->
+      <div class="board-container">
+        <div class="board-wrapper">
+          <canvas id="gameCanvas"></canvas>
+        </div>
+        <div class="board-info">
+          <span id="turnIndicator">黑棋落子</span>
+          <span class="last-move-label" id="lastMoveLabel"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="game-sidebar">
+
+      <!-- Status -->
+      <div class="glass-card status-display">
+        <div class="turn-label" id="statusTurnLabel">⚫ 黑棋落子</div>
+        <div class="move-count">第 <span id="moveCount">0</span> 手</div>
+      </div>
+
+      <!-- Rating & Tier -->
+      <div class="glass-card sidebar-section">
+        <h3>🏅 段位信息</h3>
+        <div class="rating-info" id="ratingInfo">
+          <div class="rating-row">
+            <span class="label">段位</span>
+            <span class="value"><span class="tier-badge" id="tierBadge" style="background:rgba(139,115,85,0.15);color:#8B7355;border:1px solid rgba(139,115,85,0.3);"><span class="tier-dot" style="background:#8B7355"></span>初学</span></span>
+          </div>
+          <div class="rating-row">
+            <span class="label">积分</span>
+            <span class="value" id="ratingValue">1500</span>
+          </div>
+          <div class="rating-divider"></div>
+          <div class="rating-row">
+            <span class="label">对局</span>
+            <span class="value" id="gamesPlayed">0</span>
+          </div>
+          <div class="rating-row">
+            <span class="label">胜率</span>
+            <span class="value" id="winRate">0%</span>
+          </div>
+          <div class="rating-row">
+            <span class="label">连胜/连败</span>
+            <span class="value" id="streakDisplay">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Difficulty -->
+      <div class="glass-card sidebar-section">
+        <h3>🤖 AI 难度</h3>
+        <div class="diff-selector">
+          <div class="diff-options">
+            <div class="diff-btn active" data-diff="easy" onclick="setDifficulty('easy', this)">
+              <span>简单</span>
+            </div>
+            <div class="diff-btn" data-diff="medium" onclick="setDifficulty('medium', this)">
+              <span>普通</span>
+            </div>
+            <div class="diff-btn" data-diff="hard" onclick="setDifficulty('hard', this)">
+              <span>困难</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Actions -->
+      <div class="glass-card sidebar-section">
+        <h3>⚙️ 操作</h3>
+        <div class="game-actions">
+          <button class="btn primary-action" id="btnNewGame" onclick="newGame()">🔄 重新开局</button>
+          <button class="btn" id="btnUndo" onclick="undoMove()" disabled>↩️ 悔棋</button>
+          <button class="btn" id="btnPass" onclick="passMove()">⏭️ 弃权 Pass</button>
+        </div>
+      </div>
+
+      <!-- Move History -->
+      <div class="glass-card sidebar-section">
+        <h3>📜 棋谱 <span class="badge" id="historyCount">0</span></h3>
+        <div class="move-history" id="moveHistory"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== AI THINKING ========== -->
+  <div class="ai-thinking" id="aiThinking">
+    <div class="ai-spinner"></div>
+    <div class="ai-text">AI 思考中...</div>
+  </div>
+
+  <!-- ========== GAME OVER MODAL ========== -->
+  <div class="gameover-modal" id="gameoverModal">
+    <div class="modal-card">
+      <div class="result-icon" id="goResultIcon">🏆</div>
+      <div class="result-title" id="goResultTitle">对局结束</div>
+      <div class="result-sub" id="goResultSub"></div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="label">黑棋目数</div>
+          <div class="value" id="goBlackScore">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="label">白棋目数</div>
+          <div class="value" id="goWhiteScore">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="label">总手数</div>
+          <div class="value" id="goTotalMoves">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="label">结果</div>
+          <div class="value" id="goResultDetail">—</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="btnPlayAgain" onclick="handlePlayAgain()">🔄 再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MATCH MODAL (联机匹配) ========== -->
+  <div class="match-modal" id="matchModal">
+    <div class="modal-card">
+      <div class="modal-title">🔍 联机匹配</div>
+      <div id="matchModalContent">
+        <div class="match-options">
+          <div class="option-row">
+            <label>模式</label>
+            <select id="matchModeSelect">
+              <option value="casual">休闲模式</option>
+              <option value="ranked" selected>排位模式</option>
+            </select>
+          </div>
+          <div class="option-row">
+            <label>用时</label>
+            <select id="matchTimeSelect">
+              <option value="standard">标准 (15分)</option>
+              <option value="blitz">快棋 (3分)</option>
+              <option value="rapid">超快 (1分)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="btnStartMatch" onclick="startMatch()">🔍 开始匹配</button>
+          <button class="btn btn-secondary" onclick="closeMatchModal()">取消</button>
+        </div>
+      </div>
+      <div class="match-waiting" id="matchWaiting" style="display:none;">
+        <div class="waiting-spinner">
+          <div class="dot-pulse"></div>
+          <div class="dot-pulse"></div>
+          <div class="dot-pulse"></div>
+        </div>
+        <div class="waiting-text">正在匹配对手...</div>
+        <div class="waiting-sub" id="matchWaitingSub">排位模式 · 标准用时</div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-danger" onclick="cancelMatch()">取消匹配</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== CREATE ROOM MODAL ========== -->
+  <div class="match-modal" id="createRoomModal">
+    <div class="modal-card">
+      <div class="modal-title">🏠 创建房间</div>
+      <div class="match-options">
+        <div class="option-row">
+          <label>房间名</label>
+          <input type="text" id="roomNameInput" placeholder="我的房间" maxlength="20">
+        </div>
+        <div class="option-row">
+          <label>密码(可选)</label>
+          <input type="text" id="roomPasswordInput" placeholder="留空为公开房间" maxlength="10">
+        </div>
+        <div class="option-row">
+          <label>用时</label>
+          <select id="roomTimeSelect">
+            <option value="standard">标准 (15分)</option>
+            <option value="blitz">快棋 (3分)</option>
+            <option value="rapid">超快 (1分)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="createRoom()">创建房间</button>
+        <button class="btn btn-secondary" onclick="closeModal('createRoomModal')">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== JOIN ROOM MODAL ========== -->
+  <div class="match-modal" id="joinRoomModal">
+    <div class="modal-card">
+      <div class="modal-title">🚪 加入房间</div>
+      <div class="match-options">
+        <div class="option-row">
+          <label>房间号</label>
+          <input type="text" id="joinRoomIdInput" placeholder="输入房间号" maxlength="50">
+        </div>
+        <div class="option-row">
+          <label>密码</label>
+          <input type="text" id="joinRoomPasswordInput" placeholder="留空如果无密码" maxlength="10">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="joinRoom()">加入房间</button>
+        <button class="btn btn-secondary" onclick="closeModal('joinRoomModal')">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TOAST ========== -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ========================================================================
+    //  围棋 (Go) — 完整游戏引擎 + AI + Canvas 渲染
+    // ========================================================================
+    'use strict';
+
+    // ---- Constants ----
+    const BOARD_SIZE = 19;
+    const CELL_SIZE = 34;
+    const PADDING = 28;
+    const BOARD_PX = CELL_SIZE * (BOARD_SIZE - 1);
+    const TOTAL_SIZE = BOARD_PX + PADDING * 2;
+    const STONE_RADIUS = CELL_SIZE * 0.43;
+    const KOMI = 6.5;
+
+    // ---- DOM refs ----
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = TOTAL_SIZE;
+    canvas.height = TOTAL_SIZE;
+
+    // ---- Game State ----
+    const go = {
+      board: [],        // 0=empty, 1=black, 2=white
+      currentPlayer: 1, // 1=black, 2=white
+      moveCount: 0,
+      lastMove: null,   // { row, col }
+      captures: { 1: 0, 2: 0 }, // black captures, white captures
+      koPoint: null,    // { row, col } or null
+      passCount: 0,     // consecutive passes
+      gameOver: false,
+      isAIThinking: false,
+      moveHistory: [],  // array of { row, col, player, captures }
+      boardHistory: [], // array of board snapshots for undo
+      difficulty: 'easy',
+      locked: false,    // lock board during AI turn
+      mode: 'ai',       // 'ai' or 'online'
+    };
+
+    // ---- Helper functions ----
+    const COL_LABELS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ';
+
+    function coordToLabel(row, col) {
+      return COL_LABELS[col] + (BOARD_SIZE - row);
+    }
+
+    function showToast(msg, duration) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._hide);
+      t._hide = setTimeout(function() { t.classList.remove('show'); }, duration || 2000);
+    }
+
+    // ========================================================================
+    //  BOARD INIT
+    // ========================================================================
+    function createEmptyBoard() {
+      var b = [];
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        b[r] = [];
+        for (var c = 0; c < BOARD_SIZE; c++) {
+          b[r][c] = 0;
+        }
+      }
+      return b;
+    }
+
+    function cloneBoard(b) {
+      return b.map(function(row) { return row.slice(); });
+    }
+
+    // ========================================================================
+    //  GO RULES ENGINE
+    // ========================================================================
+
+    // Get neighbors of a position
+    function getNeighbors(row, col) {
+      var n = [];
+      if (row > 0) n.push({ row: row - 1, col: col });
+      if (row < BOARD_SIZE - 1) n.push({ row: row + 1, col: col });
+      if (col > 0) n.push({ row: row, col: col - 1 });
+      if (col < BOARD_SIZE - 1) n.push({ row: row, col: col + 1 });
+      return n;
+    }
+
+    // Get the group (connected stones of same color) at a position
+    function getGroup(board, row, col) {
+      var color = board[row][col];
+      if (color === 0) return null;
+      var visited = {};
+      var group = [];
+      var queue = [{ row: row, col: col }];
+      visited[row + ',' + col] = true;
+      while (queue.length > 0) {
+        var p = queue.shift();
+        group.push(p);
+        var neighbors = getNeighbors(p.row, p.col);
+        for (var i = 0; i < neighbors.length; i++) {
+          var n = neighbors[i];
+          var key = n.row + ',' + n.col;
+          if (!visited[key] && board[n.row][n.col] === color) {
+            visited[key] = true;
+            queue.push(n);
+          }
+        }
+      }
+      return group;
+    }
+
+    // Get liberties (empty adjacent intersections) of a group
+    function getLiberties(board, group) {
+      var liberties = {};
+      for (var i = 0; i < group.length; i++) {
+        var p = group[i];
+        var neighbors = getNeighbors(p.row, p.col);
+        for (var j = 0; j < neighbors.length; j++) {
+          var n = neighbors[j];
+          if (board[n.row][n.col] === 0) {
+            liberties[n.row + ',' + n.col] = true;
+          }
+        }
+      }
+      return Object.keys(liberties).length;
+    }
+
+    // Check if a move is legal (without actually making it)
+    function isLegalMove(board, row, col, player, koPoint) {
+      // Check bounds
+      if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return false;
+      // Check empty
+      if (board[row][col] !== 0) return false;
+      // Check ko
+      if (koPoint && koPoint.row === row && koPoint.col === col) return false;
+
+      // Simulate the move
+      var simBoard = cloneBoard(board);
+      simBoard[row][col] = player;
+
+      var opponent = player === 1 ? 2 : 1;
+      var captured = false;
+
+      // Check captures of opponent groups
+      var neighbors = getNeighbors(row, col);
+      for (var i = 0; i < neighbors.length; i++) {
+        var n = neighbors[i];
+        if (simBoard[n.row][n.col] === opponent) {
+          var group = getGroup(simBoard, n.row, n.col);
+          if (group && getLiberties(simBoard, group) === 0) {
+            captured = true;
+            // Remove captured stones
+            for (var j = 0; j < group.length; j++) {
+              simBoard[group[j].row][group[j].col] = 0;
+            }
+          }
+        }
+      }
+
+      // Check suicide: if no captures were made, check if own group has liberties
+      if (!captured) {
+        var ownGroup = getGroup(simBoard, row, col);
+        if (ownGroup && getLiberties(simBoard, ownGroup) === 0) {
+          return false; // suicide
+        }
+      }
+
+      return true;
+    }
+
+    // Make a move on the board. Returns { success, captures, koPoint }
+    function makeMove(board, row, col, player) {
+      if (board[row][col] !== 0) return { success: false };
+
+      board[row][col] = player;
+      var opponent = player === 1 ? 2 : 1;
+      var totalCaptured = 0;
+      var newKo = null;
+
+      // Check captures
+      var neighbors = getNeighbors(row, col);
+      for (var i = 0; i < neighbors.length; i++) {
+        var n = neighbors[i];
+        if (board[n.row][n.col] === opponent) {
+          var group = getGroup(board, n.row, n.col);
+          if (group && getLiberties(board, group) === 0) {
+            // Capture
+            for (var j = 0; j < group.length; j++) {
+              board[group[j].row][group[j].col] = 0;
+            }
+            totalCaptured += group.length;
+          }
+        }
+      }
+
+      // Check for ko: if exactly one stone was captured and the move was a single stone
+      if (totalCaptured === 1) {
+        // Check if the placed stone has exactly one liberty (the captured point)
+        var ownGroup = getGroup(board, row, col);
+        if (ownGroup && ownGroup.length === 1) {
+          var libs = {};
+          var ownNeighbors = getNeighbors(row, col);
+          for (var k = 0; k < ownNeighbors.length; k++) {
+            if (board[ownNeighbors[k].row][ownNeighbors[k].col] === 0) {
+              libs[ownNeighbors[k].row + ',' + ownNeighbors[k].col] = true;
+            }
+          }
+          var libKeys = Object.keys(libs);
+          if (libKeys.length === 1) {
+            var parts = libKeys[0].split(',');
+            newKo = { row: parseInt(parts[0]), col: parseInt(parts[1]) };
+          }
+        }
+      }
+
+      return { success: true, captured: totalCaptured, koPoint: newKo };
+    }
+
+    // ========================================================================
+    //  TERRITORY COUNTING (Chinese counting)
+    // ========================================================================
+    function countTerritory(board) {
+      var visited = {};
+      var blackTerritory = 0;
+      var whiteTerritory = 0;
+      var blackStones = 0;
+      var whiteStones = 0;
+
+      // Count stones
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        for (var c = 0; c < BOARD_SIZE; c++) {
+          if (board[r][c] === 1) blackStones++;
+          else if (board[r][c] === 2) whiteStones++;
+        }
+      }
+
+      // Flood fill empty regions
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        for (var c = 0; c < BOARD_SIZE; c++) {
+          if (board[r][c] === 0 && !visited[r + ',' + c]) {
+            // BFS to find the empty region
+            var region = [];
+            var borders = { 1: false, 2: false };
+            var queue = [{ row: r, col: c }];
+            visited[r + ',' + c] = true;
+
+            while (queue.length > 0) {
+              var p = queue.shift();
+              region.push(p);
+              var neighbors = getNeighbors(p.row, p.col);
+              for (var i = 0; i < neighbors.length; i++) {
+                var n = neighbors[i];
+                var key = n.row + ',' + n.col;
+                if (board[n.row][n.col] === 0 && !visited[key]) {
+                  visited[key] = true;
+                  queue.push(n);
+                } else if (board[n.row][n.col] === 1) {
+                  borders[1] = true;
+                } else if (board[n.row][n.col] === 2) {
+                  borders[2] = true;
+                }
+              }
+            }
+
+            // If only one color borders the region, it's territory
+            if (borders[1] && !borders[2]) {
+              blackTerritory += region.length;
+            } else if (borders[2] && !borders[1]) {
+              whiteTerritory += region.length;
+            }
+          }
+        }
+      }
+
+      var blackScore = blackStones + blackTerritory;
+      var whiteScore = whiteStones + whiteTerritory + KOMI;
+
+      return {
+        blackStones: blackStones,
+        whiteStones: whiteStones,
+        blackTerritory: blackTerritory,
+        whiteTerritory: whiteTerritory,
+        blackScore: blackScore,
+        whiteScore: whiteScore,
+        winner: blackScore > whiteScore ? 1 : (whiteScore > blackScore ? 2 : 0),
+        diff: Math.abs(blackScore - whiteScore)
+      };
+    }
+
+    // ========================================================================
+    //  CANVAS RENDERING
+    // ========================================================================
+
+    function boardToPixel(row, col) {
+      return {
+        x: PADDING + col * CELL_SIZE,
+        y: PADDING + row * CELL_SIZE
+      };
+    }
+
+    function pixelToBoard(px, py) {
+      var col = Math.round((px - PADDING) / CELL_SIZE);
+      var row = Math.round((py - PADDING) / CELL_SIZE);
+      if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return null;
+      // Check if click is close enough to an intersection
+      var p = boardToPixel(row, col);
+      var dist = Math.sqrt((px - p.x) * (px - p.x) + (py - p.y) * (py - p.y));
+      if (dist > CELL_SIZE * 0.5) return null;
+      return { row: row, col: col };
+    }
+
+    // Animation state
+    var animStones = []; // { row, col, player, alpha, scale, type: 'place'|'remove' }
+
+    function addPlaceAnimation(row, col, player) {
+      animStones.push({ row: row, col: col, player: player, alpha: 0, scale: 0.3, type: 'place' });
+    }
+
+    function addRemoveAnimation(row, col, player) {
+      animStones.push({ row: row, col: col, player: player, alpha: 1, scale: 1, type: 'remove' });
+    }
+
+    var hoverPos = null; // { row, col }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, TOTAL_SIZE, TOTAL_SIZE);
+
+      // Board background
+      var grad = ctx.createRadialGradient(TOTAL_SIZE/2, TOTAL_SIZE/2, 0, TOTAL_SIZE/2, TOTAL_SIZE/2, TOTAL_SIZE/1.5);
+      grad.addColorStop(0, '#d4a45a');
+      grad.addColorStop(0.7, '#c8944a');
+      grad.addColorStop(1, '#b8843a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, TOTAL_SIZE, TOTAL_SIZE);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1;
+      for (var i = 0; i < BOARD_SIZE; i++) {
+        // Horizontal
+        ctx.beginPath();
+        ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
+        ctx.lineTo(PADDING + BOARD_PX, PADDING + i * CELL_SIZE);
+        ctx.stroke();
+        // Vertical
+        ctx.beginPath();
+        ctx.moveTo(PADDING + i * CELL_SIZE, PADDING);
+        ctx.lineTo(PADDING + i * CELL_SIZE, PADDING + BOARD_PX);
+        ctx.stroke();
+      }
+
+      // Star points (hoshi)
+      var starPoints = [3, 9, 15];
+      ctx.fillStyle = '#000';
+      for (var si = 0; si < starPoints.length; si++) {
+        for (var sj = 0; sj < starPoints.length; sj++) {
+          var sp = boardToPixel(starPoints[si], starPoints[sj]);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Coordinate labels
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (var c = 0; c < BOARD_SIZE; c++) {
+        var p = boardToPixel(0, c);
+        ctx.fillText(COL_LABELS[c], p.x, PADDING - 18);
+      }
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        var p = boardToPixel(r, 0);
+        ctx.fillText(BOARD_SIZE - r, PADDING - 10, p.y);
+      }
+
+      // Draw stones
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        for (var c = 0; c < BOARD_SIZE; c++) {
+          if (go.board[r][c] !== 0) {
+            drawStone(r, c, go.board[r][c], 1, 1);
+          }
+        }
+      }
+
+      // Draw animated stones
+      for (var ai = 0; ai < animStones.length; ai++) {
+        var a = animStones[ai];
+        if (a.type === 'place') {
+          drawStone(a.row, a.col, a.player, a.alpha, a.scale);
+        } else {
+          // Remove animation: fade out
+          drawStone(a.row, a.col, a.player, a.alpha, a.scale);
+        }
+      }
+
+      // Hover preview
+      if (hoverPos && !go.locked && !go.gameOver && go.board[hoverPos.row][hoverPos.col] === 0) {
+        var isLegal = isLegalMove(go.board, hoverPos.row, hoverPos.col, go.currentPlayer, go.koPoint);
+        if (isLegal) {
+          drawStone(hoverPos.row, hoverPos.col, go.currentPlayer, 0.4, 0.85);
+        }
+      }
+
+      // Last move marker
+      if (go.lastMove) {
+        var lp = boardToPixel(go.lastMove.row, go.lastMove.col);
+        var lc = go.board[go.lastMove.row][go.lastMove.col];
+        ctx.fillStyle = lc === 1 ? '#fff' : '#000';
+        ctx.beginPath();
+        ctx.arc(lp.x, lp.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawStone(row, col, player, alpha, scale) {
+      var p = boardToPixel(row, col);
+      var r = STONE_RADIUS * scale;
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
+
+      // Shadow
+      ctx.beginPath();
+      ctx.arc(p.x + 1.5, p.y + 1.5, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fill();
+
+      // Stone
+      var grad = ctx.createRadialGradient(p.x - r * 0.3, p.y - r * 0.3, r * 0.1, p.x, p.y, r);
+      if (player === 1) {
+        grad.addColorStop(0, '#444');
+        grad.addColorStop(0.5, '#222');
+        grad.addColorStop(1, '#000');
+      } else {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.5, '#f0f0f0');
+        grad.addColorStop(1, '#cccccc');
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = player === 1 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(p.x - r * 0.25, p.y - r * 0.25, r * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = player === 1 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.3)';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // ========================================================================
+    //  ANIMATION LOOP
+    // ========================================================================
+    var animRunning = false;
+
+    function updateAnimations() {
+      var alive = [];
+      var changed = false;
+      for (var i = 0; i < animStones.length; i++) {
+        var a = animStones[i];
+        if (a.type === 'place') {
+          a.alpha = Math.min(1, a.alpha + 0.08);
+          a.scale = Math.min(1, a.scale + 0.07);
+          if (a.alpha >= 1 && a.scale >= 1) {
+            // Done
+          } else {
+            alive.push(a);
+            changed = true;
+          }
+        } else {
+          // remove
+          a.alpha -= 0.06;
+          a.scale -= 0.03;
+          if (a.alpha <= 0 || a.scale <= 0.1) {
+            // Done fading
+          } else {
+            alive.push(a);
+            changed = true;
+          }
+        }
+      }
+      animStones = alive;
+      if (changed) {
+        drawBoard();
+        return true;
+      }
+      return false;
+    }
+
+    function animLoop() {
+      if (updateAnimations()) {
+        requestAnimationFrame(animLoop);
+      } else {
+        animRunning = false;
+        // If there are captured stones to actually remove from board, do it now
+        // (captures are already removed from board data in makeMove, animation is visual only)
+      }
+    }
+
+    function startAnimLoop() {
+      if (!animRunning) {
+        animRunning = true;
+        requestAnimationFrame(animLoop);
+      }
+    }
+
+    // ========================================================================
+    //  UI UPDATE
+    // ========================================================================
+    function updateUI() {
+      var turnStr = go.currentPlayer === 1 ? '⚫ 黑棋落子' : '⚪ 白棋落子';
+      document.getElementById('turnIndicator').textContent = go.gameOver ? '🏁 对局结束' : turnStr;
+      document.getElementById('statusTurnLabel').textContent = go.gameOver ? '🏁 对局结束' : turnStr;
+      document.getElementById('moveCount').textContent = go.moveCount;
+      document.getElementById('blackCaptures').textContent = go.captures[1];
+      document.getElementById('whiteCaptures').textContent = go.captures[2];
+
+      // Active turn highlighting
+      document.getElementById('playerBlackPanel').classList.toggle('active-turn', go.currentPlayer === 1 && !go.gameOver);
+      document.getElementById('playerWhitePanel').classList.toggle('active-turn', go.currentPlayer === 2 && !go.gameOver);
+
+      // Last move label
+      if (go.lastMove) {
+        document.getElementById('lastMoveLabel').textContent = '最后落子: ' + coordToLabel(go.lastMove.row, go.lastMove.col);
+      } else {
+        document.getElementById('lastMoveLabel').textContent = '';
+      }
+
+      // Undo button
+      document.getElementById('btnUndo').disabled = go.moveCount === 0 || go.gameOver || go.locked || go.isAIThinking;
+
+      // History count
+      document.getElementById('historyCount').textContent = go.moveCount;
+    }
+
+    function updateMoveHistory() {
+      var el = document.getElementById('moveHistory');
+      el.innerHTML = '';
+      for (var i = 0; i < go.moveHistory.length; i++) {
+        var m = go.moveHistory[i];
+        var div = document.createElement('div');
+        div.className = 'move-row';
+        var isBlack = m.player === 1;
+        var label = m.pass ? 'Pass' : coordToLabel(m.row, m.col);
+        div.innerHTML = '<span class="move-num">' + (i + 1) + '.</span>' +
+          '<span class="move-pos">' + (isBlack ? '⚫' : '⚪') + ' ' + label + '</span>' +
+          (m.captured > 0 ? '<span class="move-info">提' + m.captured + '子</span>' : '');
+        el.appendChild(div);
+      }
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // ========================================================================
+    //  GAME LOGIC
+    // ========================================================================
+
+    function placeStone(row, col) {
+      if (go.gameOver || go.locked || go.isAIThinking) return false;
+      if (go.board[row][col] !== 0) return false;
+
+      // Check legal move
+      if (!isLegalMove(go.board, row, col, go.currentPlayer, go.koPoint)) {
+        showToast('⚠️ 非法落子！');
+        return false;
+      }
+
+      // Save board state for undo
+      go.boardHistory.push(cloneBoard(go.board));
+
+      // Make the move
+      var result = makeMove(go.board, row, col, go.currentPlayer);
+      if (!result.success) return false;
+
+      // Add place animation
+      addPlaceAnimation(row, col, go.currentPlayer);
+
+      // Update captures
+      if (result.captured > 0) {
+        go.captures[go.currentPlayer] += result.captured;
+      }
+
+      // Record move
+      go.moveHistory.push({
+        row: row,
+        col: col,
+        player: go.currentPlayer,
+        captured: result.captured || 0,
+        pass: false
+      });
+
+      go.lastMove = { row: row, col: col };
+      go.koPoint = result.koPoint || null;
+      go.passCount = 0;
+      go.moveCount++;
+
+      // Switch player
+      go.currentPlayer = go.currentPlayer === 1 ? 2 : 1;
+
+      // Redraw
+      drawBoard();
+      startAnimLoop();
+      updateUI();
+      updateMoveHistory();
+
+      return true;
+    }
+
+    function passMove() {
+      if (go.gameOver || go.locked || go.isAIThinking) return;
+
+      go.passCount++;
+      go.boardHistory.push(cloneBoard(go.board));
+
+      go.moveHistory.push({
+        row: -1,
+        col: -1,
+        player: go.currentPlayer,
+        captured: 0,
+        pass: true
+      });
+      go.moveCount++;
+      go.koPoint = null;
+
+      // Check double pass = game over
+      if (go.passCount >= 2) {
+        endGame();
+        return;
+      }
+
+      // Switch player
+      go.currentPlayer = go.currentPlayer === 1 ? 2 : 1;
+
+      drawBoard();
+      updateUI();
+      updateMoveHistory();
+
+      showToast('⏭️ ' + (go.currentPlayer === 1 ? '黑棋' : '白棋') + ' pass，当前回合');
+
+      // If it's AI's turn, trigger AI move
+      if (go.currentPlayer === 2 && !go.gameOver) {
+        scheduleAIMove();
+      }
+    }
+
+    function undoMove() {
+      if (go.gameOver || go.locked || go.isAIThinking) return;
+      if (go.moveHistory.length < 2) return; // Need at least 2 moves to undo (player + AI)
+
+      // Undo player's move and AI's response
+      var steps = 0;
+      while (steps < 2 && go.boardHistory.length > 0) {
+        go.board = go.boardHistory.pop();
+        go.moveHistory.pop();
+        steps++;
+        go.moveCount--;
+        // Restore captures - we can't perfectly restore, so recount
+        // Recalculate captures from board state
+        go.captures = { 1: 0, 2: 0 };
+        // Simple recount: just recount stones on board
+        var blackCount = 0, whiteCount = 0;
+        for (var r = 0; r < BOARD_SIZE; r++) {
+          for (var c = 0; c < BOARD_SIZE; c++) {
+            if (go.board[r][c] === 1) blackCount++;
+            else if (go.board[r][c] === 2) whiteCount++;
+          }
+        }
+        // Estimate captures from initial total (361)
+        // This is a rough estimate
+        var totalBlack = Math.floor((go.moveHistory.filter(function(m) { return m.player === 1 && !m.pass; }).length));
+        var totalWhite = Math.floor((go.moveHistory.filter(function(m) { return m.player === 2 && !m.pass; }).length));
+        go.captures[2] = totalBlack - blackCount;
+        go.captures[1] = totalWhite - whiteCount;
+        if (go.captures[1] < 0) go.captures[1] = 0;
+        if (go.captures[2] < 0) go.captures[2] = 0;
+      }
+
+      // Restore last move
+      if (go.moveHistory.length > 0) {
+        var last = go.moveHistory[go.moveHistory.length - 1];
+        if (last.pass) {
+          go.lastMove = null;
+        } else {
+          go.lastMove = { row: last.row, col: last.col };
+        }
+      } else {
+        go.lastMove = null;
+      }
+
+      go.currentPlayer = 1; // Always player's turn after undo
+      go.passCount = 0;
+      go.koPoint = null;
+
+      drawBoard();
+      updateUI();
+      updateMoveHistory();
+      showToast('↩️ 已悔棋');
+    }
+
+    function endGame() {
+      go.gameOver = true;
+      go.locked = true;
+
+      var result = countTerritory(go.board);
+
+      // Update UI
+      drawBoard();
+      updateUI();
+
+      // Show result modal
+      setTimeout(function() {
+        var icon, title, sub;
+        if (result.winner === 1) {
+          icon = '🏆';
+          title = '黑棋胜';
+          sub = '黑棋 ' + result.blackScore.toFixed(1) + ' 目 vs 白棋 ' + result.whiteScore.toFixed(1) + ' 目';
+        } else if (result.winner === 2) {
+          icon = '🥈';
+          title = '白棋胜';
+          sub = '白棋 ' + result.whiteScore.toFixed(1) + ' 目 vs 黑棋 ' + result.blackScore.toFixed(1) + ' 目';
+        } else {
+          icon = '🤝';
+          title = '平局';
+          sub = '双方各 ' + result.blackScore.toFixed(1) + ' 目';
+        }
+
+        document.getElementById('goResultIcon').textContent = icon;
+        document.getElementById('goResultTitle').textContent = title;
+        document.getElementById('goResultSub').textContent = sub;
+        document.getElementById('goBlackScore').textContent = result.blackScore.toFixed(1) + ' 目';
+        document.getElementById('goWhiteScore').textContent = result.whiteScore.toFixed(1) + ' 目';
+        document.getElementById('goTotalMoves').textContent = go.moveCount;
+
+        var detail = '黑棋 ' + result.blackStones + '子 + ' + result.blackTerritory + '目 = ' + result.blackScore.toFixed(1) + '<br>白棋 ' + result.whiteStones + '子 + ' + result.whiteTerritory + '目 + ' + KOMI + '贴目 = ' + result.whiteScore.toFixed(1);
+        document.getElementById('goResultDetail').innerHTML = detail;
+
+        document.getElementById('gameoverModal').classList.add('show');
+      }, 500);
+    }
+
+    // ========================================================================
+    //  AI ENGINE
+    // ========================================================================
+
+    // ---- Position value table (standard Go opening theory) ----
+    var POSITION_VALUE = (function() {
+      var table = [];
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        table[r] = [];
+        for (var c = 0; c < BOARD_SIZE; c++) {
+          var distEdge = Math.min(r, c, BOARD_SIZE - 1 - r, BOARD_SIZE - 1 - c);
+          var val = 0;
+          if (distEdge === 0) val = 2;   // edge
+          else if (distEdge === 1) val = 8;  // 3rd line
+          else if (distEdge === 2) val = 10; // 4th line (ideal for opening)
+          else if (distEdge === 3) val = 7;  // 5th line
+          else if (distEdge === 4) val = 5;
+          else val = 4;
+
+          // Corner bias
+          var cornerDist = Math.min(r, c, BOARD_SIZE - 1 - r, BOARD_SIZE - 1 - c);
+          if (cornerDist <= 1) val += 3; // corner area bonus
+          if (cornerDist === 2) val += 1; // near corner
+
+          table[r][c] = val;
+        }
+      }
+      return table;
+    })();
+
+    // ---- Evaluate a position for AI (higher = better for AI which is white=2) ----
+    function evaluatePosition(board, row, col, player) {
+      var opponent = player === 1 ? 2 : 1;
+      var score = 0;
+
+      // 1. Position value
+      score += POSITION_VALUE[row][col] * 1.0;
+
+      // 2. Check captures: if placing here captures opponent stones
+      var simBoard = cloneBoard(board);
+      simBoard[row][col] = player;
+      var neighbors = getNeighbors(row, col);
+      var captureScore = 0;
+      for (var i = 0; i < neighbors.length; i++) {
+        var n = neighbors[i];
+        if (simBoard[n.row][n.col] === opponent) {
+          var group = getGroup(simBoard, n.row, n.col);
+          if (group && getLiberties(simBoard, group) === 0) {
+            captureScore += group.length * 50;
+            // Remove stones for further evaluation
+            for (var j = 0; j < group.length; j++) {
+              simBoard[group[j].row][group[j].col] = 0;
+            }
+          }
+        }
+      }
+      score += captureScore;
+
+      // 3. Check if the move saves own stones from being captured
+      var ownGroup = getGroup(simBoard, row, col);
+      if (ownGroup) {
+        var libs = getLiberties(simBoard, ownGroup);
+        if (libs === 1) score -= 30; // atari
+        else if (libs === 2) score -= 5; // needs to run
+        else if (libs >= 3) score += 5; // safe
+      }
+
+      // 4. Influence: count nearby friendly stones
+      var friendlyNear = 0;
+      var enemyNear = 0;
+      for (var dr = -3; dr <= 3; dr++) {
+        for (var dc = -3; dc <= 3; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = row + dr, nc = col + dc;
+          if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+            var dist = Math.sqrt(dr * dr + dc * dc);
+            var weight = 4 / (dist + 1);
+            if (board[nr][nc] === player) friendlyNear += weight;
+            else if (board[nr][nc] === opponent) enemyNear += weight;
+          }
+        }
+      }
+      score += (friendlyNear - enemyNear) * 2;
+
+      // 5. Territory influence: prefer areas near own territory
+      // (simplified: check if the move expands toward open areas)
+      var openSpaces = 0;
+      for (var dr = -2; dr <= 2; dr++) {
+        for (var dc = -2; dc <= 2; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          var nr = row + dr, nc = col + dc;
+          if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === 0) {
+            openSpaces++;
+          }
+        }
+      }
+      score += openSpaces * 1.5;
+
+      // 6. Edge proximity penalty (too close to edge is bad except for specific patterns)
+      if (row === 0 || row === BOARD_SIZE - 1 || col === 0 || col === BOARD_SIZE - 1) {
+        score -= 3;
+      }
+
+      return score;
+    }
+
+    // ---- Get all legal moves for a player ----
+    function getLegalMoves(board, player, koPoint) {
+      var moves = [];
+      for (var r = 0; r < BOARD_SIZE; r++) {
+        for (var c = 0; c < BOARD_SIZE; c++) {
+          if (board[r][c] === 0 && isLegalMove(board, r, c, player, koPoint)) {
+            moves.push({ row: r, col: c });
+          }
+        }
+      }
+      return moves;
+    }
+
+    // ---- AI Move Selection ----
+    function aiSelectMove() {
+      var player = 2; // AI is always white (player 2)
+      var opponent = 1;
+      var legalMoves = getLegalMoves(go.board, player, go.koPoint);
+
+      if (legalMoves.length === 0) return null;
+
+      // Difficulty-based evaluation
+      var difficulty = go.difficulty;
+
+      if (difficulty === 'easy') {
+        // Easy: mostly random with basic heuristics
+        // Filter out low-value moves sometimes
+        var scored = legalMoves.map(function(m) {
+          var score = evaluatePosition(go.board, m.row, m.col, player);
+          // Add randomness
+          score += Math.random() * 30;
+          // Captures get extra weight
+          if (go.board[m.row][m.col] === 0) {
+            var simBoard = cloneBoard(go.board);
+            simBoard[m.row][m.col] = player;
+            var neighbors = getNeighbors(m.row, m.col);
+            for (var i = 0; i < neighbors.length; i++) {
+              var n = neighbors[i];
+              if (simBoard[n.row][n.col] === opponent) {
+                var group = getGroup(simBoard, n.row, n.col);
+                if (group && getLiberties(simBoard, group) === 0) {
+                  score += 80;
+                }
+              }
+            }
+          }
+          return { move: m, score: score };
+        });
+        scored.sort(function(a, b) { return b.score - a.score; });
+        // Pick from top 5 with some randomness
+        var topN = Math.min(5, scored.length);
+        var idx = Math.floor(Math.random() * topN);
+        return scored[idx].move;
+      }
+
+      else if (difficulty === 'medium') {
+        // Medium: consider multiple factors
+        var scored = legalMoves.map(function(m) {
+          var score = evaluatePosition(go.board, m.row, m.col, player);
+          score += Math.random() * 15;
+
+          // Prioritize capturing
+          var simBoard = cloneBoard(go.board);
+          simBoard[m.row][m.col] = player;
+          var neighbors = getNeighbors(m.row, m.col);
+          for (var i = 0; i < neighbors.length; i++) {
+            var n = neighbors[i];
+            if (simBoard[n.row][n.col] === opponent) {
+              var group = getGroup(simBoard, n.row, n.col);
+              if (group && getLiberties(simBoard, group) === 0) {
+                score += 120;
+              }
+            }
+          }
+
+          // Defend own stones in atari
+          var ownGroup = getGroup(simBoard, m.row, m.col);
+          if (ownGroup) {
+            var libs = getLiberties(simBoard, ownGroup);
+            if (libs === 1) score += 60; // saving own group
+          }
+
+          return { move: m, score: score };
+        });
+        scored.sort(function(a, b) { return b.score - a.score; });
+        return scored[0].move;
+      }
+
+      else {
+        // Hard: full evaluation with multiple passes
+        var scored = legalMoves.map(function(m) {
+          var score = evaluatePosition(go.board, m.row, m.col, player);
+          score += Math.random() * 8;
+
+          var simBoard = cloneBoard(go.board);
+          simBoard[m.row][m.col] = player;
+
+          // Capture priority
+          var neighbors = getNeighbors(m.row, m.col);
+          var captureCount = 0;
+          for (var i = 0; i < neighbors.length; i++) {
+            var n = neighbors[i];
+            if (simBoard[n.row][n.col] === opponent) {
+              var group = getGroup(simBoard, n.row, n.col);
+              if (group && getLiberties(simBoard, group) === 0) {
+                captureCount += group.length;
+                for (var j = 0; j < group.length; j++) {
+                  simBoard[group[j].row][group[j].col] = 0;
+                }
+              }
+            }
+          }
+          score += captureCount * 60;
+
+          // Defensive: save own group
+          var ownGroup = getGroup(simBoard, m.row, m.col);
+          if (ownGroup) {
+            var libs = getLiberties(simBoard, ownGroup);
+            if (libs === 1) score += 100; // critical rescue
+            else if (libs === 2) score += 30;
+          }
+
+          // Attack: put opponent in atari
+          for (var dr = -1; dr <= 1; dr++) {
+            for (var dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              var nr = m.row + dr, nc = m.col + dc;
+              if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                if (simBoard[nr][nc] === opponent) {
+                  var oppGroup = getGroup(simBoard, nr, nc);
+                  if (oppGroup && getLiberties(simBoard, oppGroup) === 1) {
+                    score += 80; // put opponent in atari
+                  }
+                }
+              }
+            }
+          }
+
+          // Ko consideration: if AI can win a ko, try
+          if (go.koPoint && m.row === go.koPoint.row && m.col === go.koPoint.col) {
+            score += 150; // retake ko
+          }
+
+          // Territory building: prefer moves that surround territory
+          // Check if the move is on a "sente" point
+          var isSente = false;
+          for (var dr = -2; dr <= 2; dr++) {
+            for (var dc = -2; dc <= 2; dc++) {
+              var nr = m.row + dr, nc = m.col + dc;
+              if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                if (simBoard[nr][nc] === opponent) {
+                  var oppGroup = getGroup(simBoard, nr, nc);
+                  if (oppGroup && getLiberties(simBoard, oppGroup) <= 2) {
+                    isSente = true;
+                  }
+                }
+              }
+            }
+          }
+          if (isSente) score += 40;
+
+          return { move: m, score: score };
+        });
+
+        scored.sort(function(a, b) { return b.score - a.score; });
+        return scored[0].move;
+      }
+    }
+
+    function scheduleAIMove() {
+      if (go.gameOver) return;
+      if (go.currentPlayer !== 2) return; // AI is white (2)
+      if (go.isAIThinking) return;
+
+      go.isAIThinking = true;
+      go.locked = true;
+      document.getElementById('aiThinking').classList.add('show');
+
+      setTimeout(function() {
+        var move = aiSelectMove();
+
+        if (move === null) {
+          // No legal moves, pass
+          go.passCount++;
+          go.moveHistory.push({
+            row: -1, col: -1,
+            player: 2,
+            captured: 0,
+            pass: true
+          });
+          go.moveCount++;
+          go.koPoint = null;
+
+          if (go.passCount >= 2) {
+            go.isAIThinking = false;
+            go.locked = true;
+            document.getElementById('aiThinking').classList.remove('show');
+            endGame();
+            return;
+          }
+
+          go.currentPlayer = 1;
+          showToast('🤖 AI 选择 Pass');
+        } else {
+          // Make AI move
+          go.boardHistory.push(cloneBoard(go.board));
+          var result = makeMove(go.board, move.row, move.col, 2);
+          if (result.success) {
+            addPlaceAnimation(move.row, move.col, 2);
+            if (result.captured > 0) {
+              go.captures[2] += result.captured;
+            }
+            go.moveHistory.push({
+              row: move.row, col: move.col,
+              player: 2,
+              captured: result.captured || 0,
+              pass: false
+            });
+            go.lastMove = { row: move.row, col: move.col };
+            go.koPoint = result.koPoint || null;
+            go.passCount = 0;
+            go.moveCount++;
+            go.currentPlayer = 1;
+          }
+        }
+
+        go.isAIThinking = false;
+        go.locked = false;
+        document.getElementById('aiThinking').classList.remove('show');
+
+        drawBoard();
+        startAnimLoop();
+        updateUI();
+        updateMoveHistory();
+      }, 800);
+    }
+
+    // ========================================================================
+    //  CANVAS EVENT HANDLERS
+    // ========================================================================
+
+    canvas.addEventListener('mousemove', function(e) {
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / rect.width;
+      var scaleY = canvas.height / rect.height;
+      var px = (e.clientX - rect.left) * scaleX;
+      var py = (e.clientY - rect.top) * scaleY;
+      var pos = pixelToBoard(px, py);
+
+      if (pos && go.board[pos.row][pos.col] === 0 && !go.gameOver && !go.locked) {
+        if (!hoverPos || hoverPos.row !== pos.row || hoverPos.col !== pos.col) {
+          hoverPos = pos;
+          drawBoard();
+        }
+      } else {
+        if (hoverPos) {
+          hoverPos = null;
+          drawBoard();
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseleave', function() {
+      if (hoverPos) {
+        hoverPos = null;
+        drawBoard();
+      }
+    });
+
+    // ========================================================================
+    //  GAME CONTROL FUNCTIONS
+    // ========================================================================
+
+    function newGame() {
+      go.board = createEmptyBoard();
+      go.currentPlayer = 1;
+      go.moveCount = 0;
+      go.lastMove = null;
+      go.captures = { 1: 0, 2: 0 };
+      go.koPoint = null;
+      go.passCount = 0;
+      go.gameOver = false;
+      go.isAIThinking = false;
+      go.locked = false;
+      go.moveHistory = [];
+      go.boardHistory = [];
+      animStones = [];
+      hoverPos = null;
+
+      document.getElementById('gameoverModal').classList.remove('show');
+      document.getElementById('aiThinking').classList.remove('show');
+
+      drawBoard();
+      updateUI();
+      updateMoveHistory();
+      showToast('🔄 新对局开始！');
+    }
+
+    function setDifficulty(level, el) {
+      go.difficulty = level;
+      var btns = document.querySelectorAll('.diff-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.remove('active');
+      }
+      if (el) el.classList.add('active');
+      showToast('🤖 AI 难度已切换为: ' + (level === 'easy' ? '简单' : level === 'medium' ? '普通' : '困难'));
+    }
+
+    // ========================================================================
+    //  ONLINE MODE & SOCKET.IO
+    // ========================================================================
+
+    // ---- Tier definitions (client-side) ----
+    var TIERS = [
+      { min: 0, max: 999, name: '初学', color: '#8B7355' },
+      { min: 1000, max: 1299, name: '业余初级', color: '#2E8B57' },
+      { min: 1300, max: 1499, name: '业余中级', color: '#1E90FF' },
+      { min: 1500, max: 1699, name: '业余高级', color: '#9370DB' },
+      { min: 1700, max: 1899, name: '专业初级', color: '#FF4500' },
+      { min: 1900, max: 2099, name: '专业中级', color: '#FF6347' },
+      { min: 2100, max: 2299, name: '专业高级', color: '#FF1493' },
+      { min: 2300, max: 2499, name: '大师', color: '#FFD700' },
+      { min: 2500, max: Infinity, name: '宗师', color: '#FF0000' },
+    ];
+
+    function getTierName(rating) {
+      for (var i = 0; i < TIERS.length; i++) {
+        if (rating >= TIERS[i].min && rating <= TIERS[i].max) {
+          return TIERS[i].name;
+        }
+      }
+      return '宗师';
+    }
+
+    function getTierColor(tierName) {
+      for (var i = 0; i < TIERS.length; i++) {
+        if (TIERS[i].name === tierName) {
+          return TIERS[i].color;
+        }
+      }
+      return '#8B7355';
+    }
+
+    function updateTierBadge(tierName, rating) {
+      var color = getTierColor(tierName);
+      var badge = document.getElementById('tierBadge');
+      badge.innerHTML = '<span class="tier-dot" style="background:' + color + '"></span>' + tierName;
+      badge.style.background = 'rgba(' + hexToRgb(color) + ',0.15)';
+      badge.style.color = color;
+      badge.style.borderColor = 'rgba(' + hexToRgb(color) + ',0.3)';
+      document.getElementById('ratingValue').textContent = Math.round(rating);
+    }
+
+    function hexToRgb(hex) {
+      var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? parseInt(result[1], 16) + ',' + parseInt(result[2], 16) + ',' + parseInt(result[3], 16) : '139,115,85';
+    }
+
+    // ---- Socket.IO ----
+    var socket = null;
+    var connected = false;
+    var currentRoomId = null;
+    var inQueue = false;
+    var isMyTurn = false;
+    var onlinePlayerColor = 1; // 1=black, 2=white
+    var opponentInfo = null;
+
+    function initSocket() {
+      socket = io(window.location.origin, {
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', function() {
+        connected = true;
+        document.getElementById('connectionDot').className = 'dot online';
+        document.getElementById('lobbyStatus').textContent = '🟢 已连接';
+        showToast('✅ 已连接到服务器');
+        fetchRating();
+      });
+
+      socket.on('disconnect', function() {
+        connected = false;
+        document.getElementById('connectionDot').className = 'dot offline';
+        document.getElementById('lobbyStatus').textContent = '🔴 未连接';
+        if (inQueue) {
+          inQueue = false;
+          showToast('⚠️ 连接断开，已退出匹配队列');
+        }
+      });
+
+      // ---- Match events ----
+      socket.on('go_match_found', function(data) {
+        inQueue = false;
+        closeMatchModal();
+        currentRoomId = data.roomId;
+        opponentInfo = data.opponent;
+        showToast('🎯 匹配成功！对阵 ' + (data.opponent.username || '对手'));
+        document.getElementById('roomInfoBar').classList.add('show');
+        document.getElementById('roomIdDisplay').textContent = data.roomId;
+        document.getElementById('roomStatusText').textContent = '🔄 等待游戏开始...';
+        // Show opponent info
+        document.getElementById('opponentInfo').classList.add('show');
+        document.getElementById('opponentName').textContent = data.opponent.username || '对手';
+        if (data.opponent.rating) {
+          var oppTier = getTierName(data.opponent.rating.rating || 1500);
+          var oppColor = getTierColor(oppTier);
+          document.getElementById('opponentTier').innerHTML = '<span class="tier-badge" style="background:rgba(' + hexToRgb(oppColor) + ',0.15);color:' + oppColor + ';border:1px solid rgba(' + hexToRgb(oppColor) + ',0.3);padding:2px 8px;font-size:11px;"><span class="tier-dot" style="background:' + oppColor + '"></span>' + oppTier + '</span> 积分:' + Math.round(data.opponent.rating.rating || 1500);
+        }
+        // Self rating display
+        if (data.selfRating) {
+          updateTierBadge(getTierName(data.selfRating.rating || 1500), data.selfRating.rating || 1500);
+        }
+      });
+
+      socket.on('go_queue_status', function(data) {
+        if (data.inQueue) {
+          inQueue = true;
+          var pos = data.position || '?';
+          document.getElementById('matchWaitingSub').textContent = '队列位置: #' + pos;
+        } else {
+          inQueue = false;
+        }
+      });
+
+      socket.on('go_room_created', function(data) {
+        currentRoomId = data.roomId;
+        document.getElementById('roomInfoBar').classList.add('show');
+        document.getElementById('roomIdDisplay').textContent = data.roomId;
+        document.getElementById('roomStatusText').textContent = '⏳ 等待对手加入...';
+        showToast('🏠 房间创建成功！房间号: ' + data.roomId);
+      });
+
+      socket.on('go_game_start', function(data) {
+        // Switch to online mode
+        go.mode = 'online';
+        document.getElementById('roomInfoBar').classList.add('show');
+        document.getElementById('roomIdDisplay').textContent = data.roomId || currentRoomId;
+        document.getElementById('roomStatusText').textContent = '🎮 对局中';
+
+        // Determine player color
+        var players = data.players || [];
+        var myId = currentUser ? currentUser.id : null;
+        if (players.length >= 2) {
+          if (players[0].id === myId) {
+            onlinePlayerColor = 1; // Black
+          } else {
+            onlinePlayerColor = 2; // White
+          }
+        }
+
+        // Update UI
+        if (onlinePlayerColor === 1) {
+          document.getElementById('blackName').textContent = '黑棋 (' + (currentUser ? currentUser.username : '你') + ')';
+          document.getElementById('whiteName').textContent = '白棋 (' + (opponentInfo ? opponentInfo.username : '对手') + ')';
+        } else {
+          document.getElementById('blackName').textContent = '黑棋 (' + (opponentInfo ? opponentInfo.username : '对手') + ')';
+          document.getElementById('whiteName').textContent = '白棋 (' + (currentUser ? currentUser.username : '你') + ')';
+        }
+
+        // Update avatar based on color
+        if (onlinePlayerColor === 1) {
+          document.getElementById('blackAvatar').src = currentUser && currentUser.avatar ? currentUser.avatar : '/images/default-avatar.png';
+          document.getElementById('whiteAvatar').src = '/images/default-avatar.png';
+        } else {
+          document.getElementById('blackAvatar').src = '/images/default-avatar.png';
+          document.getElementById('whiteAvatar').src = currentUser && currentUser.avatar ? currentUser.avatar : '/images/default-avatar.png';
+        }
+
+        // Start game
+        newGame();
+        go.mode = 'online';
+
+        // Set turn
+        isMyTurn = (data.currentTurn === myId);
+        go.currentPlayer = data.currentTurn === myId ? onlinePlayerColor : (onlinePlayerColor === 1 ? 2 : 1);
+        go.locked = !isMyTurn;
+
+        updateUI();
+        showToast('🎮 对局开始！' + (isMyTurn ? '轮到你了' : '等待对手落子'));
+      });
+
+      socket.on('go_moved', function(data) {
+        if (!data.move || go.mode !== 'online') return;
+        var move = data.move;
+        var row = move.row, col = move.col;
+
+        // Handle pass
+        if (move.pass || row === -1 || col === -1) {
+          go.passCount++;
+          go.boardHistory.push(cloneBoard(go.board));
+          var movingPlayer = onlinePlayerColor === 1 ? 2 : 1;
+          go.moveHistory.push({
+            row: -1, col: -1,
+            player: movingPlayer,
+            captured: 0,
+            pass: true
+          });
+          go.moveCount++;
+          go.koPoint = null;
+
+          if (go.passCount >= 2) {
+            endGame();
+            return;
+          }
+
+          go.currentPlayer = onlinePlayerColor;
+          isMyTurn = true;
+          go.locked = false;
+
+          drawBoard();
+          updateUI();
+          updateMoveHistory();
+          showToast('⏭️ 对手选择了 Pass');
+          return;
+        }
+
+        // Normal move
+        if (row === undefined || col === undefined) return;
+
+        // Set the current player to the one who moved
+        var movingPlayer = onlinePlayerColor === 1 ? 2 : 1;
+
+        // Save board state for undo
+        go.boardHistory.push(cloneBoard(go.board));
+
+        // Make the move
+        var result = makeMove(go.board, row, col, movingPlayer);
+        if (!result.success) return;
+
+        addPlaceAnimation(row, col, movingPlayer);
+
+        // Update captures
+        if (result.captured > 0) {
+          go.captures[movingPlayer] += result.captured;
+        }
+
+        // Record move
+        go.moveHistory.push({
+          row: row,
+          col: col,
+          player: movingPlayer,
+          captured: result.captured || 0,
+          pass: false
+        });
+
+        go.lastMove = { row: row, col: col };
+        go.koPoint = result.koPoint || null;
+        go.passCount = 0;
+        go.moveCount++;
+
+        // Switch to current player
+        go.currentPlayer = onlinePlayerColor;
+        isMyTurn = true;
+        go.locked = false;
+
+        drawBoard();
+        startAnimLoop();
+        updateUI();
+        updateMoveHistory();
+      });
+
+      socket.on('go_game_over', function(data) {
+        go.gameOver = true;
+        go.locked = true;
+        drawBoard();
+        updateUI();
+
+        var winnerId = data.winnerId;
+        var reason = data.reason || '';
+        var myId = currentUser ? currentUser.id : null;
+        var isWin = winnerId === myId;
+        var isDraw = !winnerId;
+
+        setTimeout(function() {
+          var icon, title, sub;
+          if (isDraw) {
+            icon = '🤝';
+            title = '平局';
+            sub = reason === 'draw' ? '双方同意和棋' : '对局结束';
+          } else if (isWin) {
+            icon = '🏆';
+            title = '你赢了！';
+            sub = reason === 'resign' ? '对手认输' : '获胜';
+          } else {
+            icon = '😅';
+            title = '你输了';
+            sub = reason === 'resign' ? '你认输了' : reason === 'timeout' ? '超时负' : '对局结束';
+          }
+
+          document.getElementById('goResultIcon').textContent = icon;
+          document.getElementById('goResultTitle').textContent = title;
+          document.getElementById('goResultSub').textContent = sub;
+          document.getElementById('goBlackScore').textContent = go.captures[1] + ' 提子';
+          document.getElementById('goWhiteScore').textContent = go.captures[2] + ' 提子';
+          document.getElementById('goTotalMoves').textContent = go.moveCount;
+          document.getElementById('goResultDetail').textContent = reason || '—';
+
+          document.getElementById('gameoverModal').classList.add('show');
+        }, 500);
+
+        // Clean up room
+        document.getElementById('roomInfoBar').classList.remove('show');
+        document.getElementById('opponentInfo').classList.remove('show');
+        currentRoomId = null;
+      });
+
+      socket.on('go_rating_update', function(data) {
+        var myId = currentUser ? currentUser.id : null;
+        if (myId && data[myId]) {
+          var r = data[myId];
+          updateTierBadge(r.tier || getTierName(r.rating), r.rating);
+          var changeStr = r.change > 0 ? '+' + r.change : r.change;
+          showToast('📊 积分变化: ' + changeStr + ' (' + (r.tier || getTierName(r.rating)) + ')', 3000);
+
+          // Update rating display
+          document.getElementById('ratingValue').textContent = Math.round(r.rating);
+          var tierName = r.tier || getTierName(r.rating);
+          var color = getTierColor(tierName);
+          var badge = document.getElementById('tierBadge');
+          badge.innerHTML = '<span class="tier-dot" style="background:' + color + '"></span>' + tierName;
+          badge.style.background = 'rgba(' + hexToRgb(color) + ',0.15)';
+          badge.style.color = color;
+          badge.style.borderColor = 'rgba(' + hexToRgb(color) + ',0.3)';
+        }
+      });
+
+      socket.on('go_error', function(msg) {
+        showToast('⚠️ ' + (typeof msg === 'string' ? msg : '操作失败'));
+      });
+
+      socket.on('go_draw_offer', function() {
+        if (confirm('🤝 对手请求和棋，是否同意？')) {
+          socket.emit('go_accept_draw', { roomId: currentRoomId });
+        }
+      });
+
+      socket.on('go_chat', function(data) {
+        if (data.from && data.message) {
+          showToast('💬 ' + data.from + ': ' + data.message, 3000);
+        }
+      });
+    }
+
+    // ---- Match/Room Functions ----
+    function switchMode(mode, btn) {
+      if (mode === 'online' && !connected) {
+        showToast('⚠️ 未连接到服务器');
+        return;
+      }
+      go.mode = mode;
+      var btns = document.querySelectorAll('.match-lobby-bar .mode-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.remove('active');
+      }
+      if (btn) btn.classList.add('active');
+
+      if (mode === 'ai') {
+        // Reset to AI mode
+        document.getElementById('opponentInfo').classList.remove('show');
+        document.getElementById('roomInfoBar').classList.remove('show');
+        document.getElementById('blackName').textContent = '黑棋 (你)';
+        document.getElementById('whiteName').textContent = '白棋 (AI)';
+        document.getElementById('blackAvatar').src = currentUser && currentUser.avatar ? currentUser.avatar : '/images/default-avatar.png';
+        document.getElementById('whiteAvatar').src = '/images/default-avatar.png';
+        if (currentRoomId) {
+          if (inQueue) {
+            socket.emit('go_leave_queue');
+            inQueue = false;
+          }
+          currentRoomId = null;
+        }
+        newGame();
+        showToast('🤖 已切换到 AI 对战模式');
+      }
+    }
+
+    function openMatchModal() {
+      if (!connected) {
+        showToast('⚠️ 未连接到服务器，请刷新页面重试');
+        return;
+      }
+      document.getElementById('matchModal').classList.add('show');
+      document.getElementById('matchModalContent').style.display = 'block';
+      document.getElementById('matchWaiting').style.display = 'none';
+    }
+
+    function closeMatchModal() {
+      document.getElementById('matchModal').classList.remove('show');
+    }
+
+    function startMatch() {
+      if (!connected) {
+        showToast('⚠️ 未连接到服务器');
+        return;
+      }
+      if (inQueue) return;
+      var mode = document.getElementById('matchModeSelect').value;
+      var time = document.getElementById('matchTimeSelect').value;
+      socket.emit('go_join_queue', { mode: mode, timeControl: time });
+      document.getElementById('matchModalContent').style.display = 'none';
+      document.getElementById('matchWaiting').style.display = 'block';
+      document.getElementById('matchWaitingSub').textContent = (mode === 'ranked' ? '排位模式' : '休闲模式') + ' · ' + document.getElementById('matchTimeSelect').selectedOptions[0].text;
+      showToast('🔍 已加入匹配队列...');
+    }
+
+    function cancelMatch() {
+      if (!connected) return;
+      socket.emit('go_leave_queue');
+      inQueue = false;
+      document.getElementById('matchModalContent').style.display = 'block';
+      document.getElementById('matchWaiting').style.display = 'none';
+      closeMatchModal();
+      showToast('已取消匹配');
+    }
+
+    function openCreateRoomModal() {
+      if (!connected) {
+        showToast('⚠️ 未连接到服务器');
+        return;
+      }
+      document.getElementById('createRoomModal').classList.add('show');
+    }
+
+    function openJoinRoomModal() {
+      if (!connected) {
+        showToast('⚠️ 未连接到服务器');
+        return;
+      }
+      document.getElementById('joinRoomModal').classList.add('show');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('show');
+    }
+
+    function createRoom() {
+      if (!connected) return;
+      var name = document.getElementById('roomNameInput').value || '我的房间';
+      var password = document.getElementById('roomPasswordInput').value || '';
+      var time = document.getElementById('roomTimeSelect').value;
+      socket.emit('go_create_room', { roomName: name, password: password, timeControl: time });
+      closeModal('createRoomModal');
+      // Switch to online mode
+      go.mode = 'online';
+      var btns = document.querySelectorAll('.match-lobby-bar .mode-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+    }
+
+    function joinRoom() {
+      if (!connected) return;
+      var roomId = document.getElementById('joinRoomIdInput').value.trim();
+      var password = document.getElementById('joinRoomPasswordInput').value || '';
+      if (!roomId) {
+        showToast('⚠️ 请输入房间号');
+        return;
+      }
+      socket.emit('go_join_room', { roomId: roomId, password: password });
+      closeModal('joinRoomModal');
+      // Switch to online mode
+      go.mode = 'online';
+      var btns = document.querySelectorAll('.match-lobby-bar .mode-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+    }
+
+    // ---- Online Move Functions ----
+    function sendOnlineMove(row, col) {
+      if (!connected || !currentRoomId) return false;
+      socket.emit('go_move', { roomId: currentRoomId, move: { row: row, col: col } });
+      return true;
+    }
+
+    function sendOnlinePass() {
+      if (!connected || !currentRoomId) return;
+      socket.emit('go_move', { roomId: currentRoomId, move: { row: -1, col: -1, pass: true } });
+    }
+
+    function resignOnline() {
+      if (!connected || !currentRoomId) return;
+      if (confirm('确定要认输吗？')) {
+        socket.emit('go_resign', { roomId: currentRoomId });
+      }
+    }
+
+    function offerDrawOnline() {
+      if (!connected || !currentRoomId) return;
+      socket.emit('go_offer_draw', { roomId: currentRoomId });
+      showToast('🤝 已发送和棋请求');
+    }
+
+    // ---- Fetch Rating ----
+    function fetchRating() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/go/rating', true);
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            var tier = data.tier || getTierName(data.rating);
+            updateTierBadge(tier, data.rating);
+            document.getElementById('gamesPlayed').textContent = data.games_played || 0;
+            var wins = data.wins || 0;
+            var total = data.games_played || 0;
+            var winRate = total > 0 ? Math.round((wins / total) * 100) + '%' : '0%';
+            document.getElementById('winRate').textContent = winRate;
+            var streak = data.streak || 0;
+            if (streak > 0) {
+              document.getElementById('streakDisplay').textContent = '🔥 ' + streak + '连胜';
+              document.getElementById('streakDisplay').className = 'value positive';
+            } else if (streak < 0) {
+              document.getElementById('streakDisplay').textContent = '💔 ' + Math.abs(streak) + '连败';
+              document.getElementById('streakDisplay').className = 'value negative';
+            } else {
+              document.getElementById('streakDisplay').textContent = '—';
+              document.getElementById('streakDisplay').className = 'value';
+            }
+          } catch(e) {
+            // Ignore parse errors
+          }
+        }
+      };
+      xhr.send();
+    }
+
+    // ---- Handle Play Again ----
+    function handlePlayAgain() {
+      document.getElementById('gameoverModal').classList.remove('show');
+      if (go.mode === 'online') {
+        // Reset to AI mode
+        go.mode = 'ai';
+        var btns = document.querySelectorAll('.match-lobby-bar .mode-btn');
+        for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+        if (btns[0]) btns[0].classList.add('active');
+        document.getElementById('opponentInfo').classList.remove('show');
+        document.getElementById('roomInfoBar').classList.remove('show');
+        document.getElementById('blackName').textContent = '黑棋 (你)';
+        document.getElementById('whiteName').textContent = '白棋 (AI)';
+        document.getElementById('blackAvatar').src = currentUser && currentUser.avatar ? currentUser.avatar : '/images/default-avatar.png';
+        document.getElementById('whiteAvatar').src = '/images/default-avatar.png';
+        currentRoomId = null;
+        newGame();
+      } else {
+        newGame();
+      }
+    }
+
+    // ---- Override newGame to handle online mode ----
+    var originalNewGame = newGame;
+    newGame = function() {
+      originalNewGame();
+      if (go.mode === 'online') {
+        // Don't trigger AI in online mode
+        go.locked = !isMyTurn;
+        // Update names based on online mode
+        if (onlinePlayerColor === 1) {
+          document.getElementById('blackName').textContent = '黑棋 (' + (currentUser ? currentUser.username : '你') + ')';
+          document.getElementById('whiteName').textContent = '白棋 (' + (opponentInfo ? opponentInfo.username : '对手') + ')';
+        } else {
+          document.getElementById('blackName').textContent = '黑棋 (' + (opponentInfo ? opponentInfo.username : '对手') + ')';
+          document.getElementById('whiteName').textContent = '白棋 (' + (currentUser ? currentUser.username : '你') + ')';
+        }
+      }
+    };
+
+    // ---- Override canvas click handler for online mode ----
+    canvas.addEventListener('click', function(e) {
+      if (go.gameOver || go.locked || go.isAIThinking) return;
+      if (go.mode === 'online') {
+        if (!isMyTurn) {
+          showToast('⏳ 等待对手落子');
+          return;
+        }
+        if (go.currentPlayer !== onlinePlayerColor) return;
+      } else {
+        if (go.currentPlayer === 2) return; // AI's turn
+      }
+
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / rect.width;
+      var scaleY = canvas.height / rect.height;
+      var px = (e.clientX - rect.left) * scaleX;
+      var py = (e.clientY - rect.top) * scaleY;
+      var pos = pixelToBoard(px, py);
+
+      if (!pos) return;
+
+      if (go.mode === 'online') {
+        // Online mode: send move via socket
+        if (placeStone(pos.row, pos.col)) {
+          isMyTurn = false;
+          go.locked = true;
+          sendOnlineMove(pos.row, pos.col);
+        }
+      } else {
+        // AI mode: existing logic
+        if (placeStone(pos.row, pos.col)) {
+          if (!go.gameOver && go.currentPlayer === 2) {
+            scheduleAIMove();
+          }
+        }
+      }
+    });
+
+    // ---- Override passMove for online mode ----
+    var originalPassMove = passMove;
+    passMove = function() {
+      if (go.gameOver || go.locked || go.isAIThinking) return;
+
+      if (go.mode === 'online') {
+        if (!isMyTurn) {
+          showToast('⏳ 等待对手落子');
+          return;
+        }
+        // Send pass move
+        go.passCount++;
+        go.boardHistory.push(cloneBoard(go.board));
+        go.moveHistory.push({
+          row: -1, col: -1,
+          player: go.currentPlayer,
+          captured: 0,
+          pass: true
+        });
+        go.moveCount++;
+        go.koPoint = null;
+
+        if (go.passCount >= 2) {
+          endGame();
+          return;
+        }
+
+        go.currentPlayer = go.currentPlayer === 1 ? 2 : 1;
+        isMyTurn = false;
+        go.locked = true;
+
+        drawBoard();
+        updateUI();
+        updateMoveHistory();
+        sendOnlinePass();
+        showToast('⏭️ 你选择了 Pass');
+      } else {
+        originalPassMove();
+      }
+    };
+
+    // ---- Add resign/offer draw buttons in online mode ----
+    function updateOnlineActions() {
+      if (go.mode === 'online' && !go.gameOver) {
+        var actions = document.querySelector('.game-actions');
+        if (!document.getElementById('btnResign')) {
+          var resignBtn = document.createElement('button');
+          resignBtn.className = 'btn';
+          resignBtn.id = 'btnResign';
+          resignBtn.textContent = '🏳️ 认输';
+          resignBtn.onclick = resignOnline;
+          actions.appendChild(resignBtn);
+
+          var drawBtn = document.createElement('button');
+          drawBtn.className = 'btn';
+          drawBtn.id = 'btnDraw';
+          drawBtn.textContent = '🤝 求和';
+          drawBtn.onclick = offerDrawOnline;
+          actions.appendChild(drawBtn);
+        }
+      } else {
+        var resignBtn = document.getElementById('btnResign');
+        var drawBtn = document.getElementById('btnDraw');
+        if (resignBtn) { resignBtn.remove(); }
+        if (drawBtn) { drawBtn.remove(); }
+      }
+    }
+
+    // Override updateUI to also update online actions
+    var originalUpdateUI = updateUI;
+    updateUI = function() {
+      originalUpdateUI();
+      updateOnlineActions();
+    };
+
+    // ========================================================================
+    //  INITIALIZATION
+    // ========================================================================
+
+    // Initialize from EJS data
+    var currentUser = <%- JSON.stringify(typeof user !== 'undefined' ? user : null) %>;
+
+    // Initialize socket.io
+    initSocket();
+
+    newGame();
+    updateUI();
+    updateMoveHistory();
+
+    // Fetch rating on load
+    fetchRating();
+
+    console.log('✅ 围棋游戏已加载');
+  </script>
+</body>
+</html>

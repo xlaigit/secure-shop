@@ -119,7 +119,10 @@
 
     <div class="section-header">
       <h1>💰 交易记录</h1>
-      <p>共 <%= transactions.length %> 笔交易</p>
+      <div style="display:flex;align-items:center;gap:10px">
+        <p>共 <%= transactions.length %> 笔交易</p>
+        <a href="/api/export/billing" style="display:inline-flex;align-items:center;gap:4px;padding:6px 14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">📥 导出CSV</a>
+      </div>
     </div>
 
     <% if (transactions.length === 0) { %>

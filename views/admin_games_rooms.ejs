@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>房间管理 · 游戏管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    h1 .refresh-btn{margin-left:auto;padding:8px 16px;background:#f3f4f6;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;display:flex;align-items:center;gap:6px}
+    h1 .refresh-btn:hover{background:#e5e7eb}
+    h1 .refresh-btn.spinning svg{animation:spin .8s linear infinite}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white;box-shadow:0 4px 12px rgba(6,182,212,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(6,182,212,.4)}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    .btn-sm{padding:6px 12px;font-size:11px;border-radius:8px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px}
+    tr:hover td{background:#ecfeff}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-waiting{background:#fffbeb;color:#92400e}
+    .badge-playing{background:#ecfdf5;color:#065f46}
+    .badge-finished{background:#f3f4f6;color:#6b7280}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    .room-id{font-family:monospace;font-size:12px;color:#6b7280;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+    .toast{position:fixed;top:20px;right:20px;background:#059669;color:white;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;display:none;animation:slideIn .3s ease}
+    .toast.error{background:#dc2626}
+    @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+    @media(max-width:768px){.nav{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast"></div>
+  <div class="nav">
+    <span class="brand">🚪 游戏房间管理</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/games/seasons">🏆 赛季</a>
+      <a href="/admin/games/announcements">📢 公告</a>
+      <a href="/admin/games/rooms" class="active">🚪 房间</a>
+      <a href="/admin/logout" style="color:#dc2626">退出</a>
+    </div>
+  </div>
+  <div class="container">
+    <h1>
+      🚪 房间管理
+      <button class="refresh-btn" onclick="refreshPage()" id="refreshBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        刷新
+      </button>
+    </h1>
+    <div class="card">
+      <h2>📋 活跃房间列表 <span style="font-size:13px;color:#6b7280;font-weight:400">（共 <span id="roomCount"><%= rooms.length %></span> 个房间）</span></h2>
+      <% if (rooms.length === 0) { %>
+        <div class="empty">暂无活跃房间</div>
+      <% } else { %>
+      <table>
+        <thead><tr>
+          <th>房间 ID</th>
+          <th>游戏类型</th>
+          <th>玩家数</th>
+          <th>玩家列表</th>
+          <th>状态</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr></thead>
+        <tbody>
+        <% rooms.forEach(function(r) { %>
+          <tr>
+            <td><div class="room-id" title="<%= r.id %>"><%= r.id %></div></td>
+            <td>
+              <% if (r.gameType === 'chess') { %>♟️ 国际象棋
+              <% } else if (r.gameType === 'gomoku') { %>⚫ 五子棋
+              <% } else if (r.gameType === 'go') { %>⚪ 围棋
+              <% } else { %><%= r.gameType %><% } %>
+            </td>
+            <td><%= r.playerCount %></td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis"><%= r.players || '-' %></td>
+            <td>
+              <% if (r.state === 'waiting') { %><span class="badge badge-waiting">⏳ 等待中</span>
+              <% } else if (r.state === 'playing') { %><span class="badge badge-playing">🎮 游戏中</span>
+              <% } else { %><span class="badge badge-finished"><%= r.state %></span><% } %>
+            </td>
+            <td style="color:#6b7280"><%= r.createdAt %></td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="closeRoom('<%= r.id %>')">关闭房间</button>
+            </td>
+          </tr>
+        <% }); %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+  </div>
+
+  <script>
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast' + (isError ? ' error' : '');
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    function closeRoom(roomId) {
+      if (!confirm('确定关闭房间 ' + roomId + ' 吗？')) return;
+      fetch('/admin/games/rooms/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, _csrf: '<%= csrfToken %>' })
+      }).then(r => r.json()).then(data => {
+        if (data.ok) {
+          showToast('房间已关闭');
+          setTimeout(() => location.reload(), 500);
+        } else {
+          showToast(data.error || '关闭失败', true);
+        }
+      }).catch(() => showToast('网络错误', true));
+    }
+
+    function refreshPage() {
+      const btn = document.getElementById('refreshBtn');
+      btn.classList.add('spinning');
+      location.reload();
+    }
+  </script>
+</body>
+</html>

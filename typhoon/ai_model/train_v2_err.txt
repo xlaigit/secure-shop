@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "D:\肖宇帆\HTML项目\typhoon\ai_model\train_model_v2.py", line 424, in <module>
+    train_model_v2()
+  File "D:\肖宇帆\HTML项目\typhoon\ai_model\train_model_v2.py", line 335, in train_model_v2
+    result = load_and_prepare_data()
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\肖宇帆\HTML项目\typhoon\ai_model\train_model_v2.py", line 218, in load_and_prepare_data
+    joblib.dump({
+  File "C:\Users\tmdcm\AppData\Local\Programs\Python\Python311\Lib\site-packages\joblib\numpy_pickle.py", line 599, in dump
+    with open(filename, "wb") as f:
+         ^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: 'D:/AI_Model\\track_scaler_v2.pkl'

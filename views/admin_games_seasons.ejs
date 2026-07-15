@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>赛季管理 · 游戏管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    h1 .actions{margin-left:auto;display:flex;gap:8px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white;box-shadow:0 4px 12px rgba(6,182,212,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(6,182,212,.4)}
+    .btn-success{background:linear-gradient(135deg,#10b981,#059669);color:white;box-shadow:0 4px 12px rgba(16,185,129,.3)}
+    .btn-success:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(16,185,129,.4)}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    .btn-sm{padding:6px 12px;font-size:11px;border-radius:8px}
+    .btn-warning{background:#fffbeb;color:#d97706;border:2px solid #fde68a}
+    .btn-warning:hover{background:#fef3c7}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px;vertical-align:middle}
+    tr:hover td{background:#ecfeff}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-season{background:#eef2ff;color:#4338ca}
+    .badge-active{background:#ecfdf5;color:#059669}
+    .badge-inactive{background:#f3f4f6;color:#6b7280}
+    .badge-ended{background:#fef2f2;color:#dc2626}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    .stat-box{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f3f4f6;border-radius:8px;font-size:12px;color:#6b7280;margin-right:8px}
+    .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center}
+    .modal-overlay.active{display:flex}
+    .modal{background:white;border-radius:16px;padding:28px;max-width:520px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+    .modal h3{font-size:18px;margin-bottom:16px}
+    .modal p{font-size:14px;color:#6b7280;margin-bottom:20px;line-height:1.5}
+    .modal .btn-group{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+    .form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+    .form-row label{font-size:12px;color:#6b7280;font-weight:500}
+    .form-row input,.form-row textarea,.form-row select{padding:9px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+    .form-row input:focus,.form-row textarea:focus,.form-row select:focus{border-color:#06b6d4}
+    .form-row textarea{min-height:60px;resize:vertical}
+    .form-row .hint{font-size:11px;color:#9ca3af;margin-top:2px}
+    .form-row-inline{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .status-indicator{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+    .status-indicator.active{background:#10b981}
+    .status-indicator.inactive{background:#9ca3af}
+    .status-indicator.ended{background:#ef4444}
+    .action-group{display:flex;gap:6px;flex-wrap:wrap}
+    .toast{position:fixed;top:20px;right:20px;padding:14px 20px;border-radius:12px;color:white;font-size:13px;font-weight:500;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.2);transition:all .3s;max-width:360px}
+    .toast.success{background:linear-gradient(135deg,#10b981,#059669)}
+    .toast.error{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    @media(max-width:768px){.nav{justify-content:center}.form-row-inline{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <span class="brand">🎮 游戏赛季管理</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/games/seasons" class="active">🏆 赛季</a>
+      <a href="/admin/games/announcements">📢 公告</a>
+      <a href="/admin/games/rooms">🚪 房间</a>
+      <a href="/admin/logout" style="color:#dc2626">退出</a>
+    </div>
+  </div>
+  <div class="container">
+    <h1>
+      🏆 赛季管理
+      <span class="actions">
+        <button class="btn btn-success" onclick="openCreateModal()">➕ 创建赛季</button>
+      </span>
+    </h1>
+
+    <% if (seasons.length === 0) { %>
+      <div class="card">
+        <div class="empty">
+          <div style="font-size:48px;margin-bottom:12px">🏆</div>
+          <p>暂无赛季数据，点击上方"创建赛季"按钮添加</p>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="card" style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>游戏</th>
+            <th>赛季</th>
+            <th>名称</th>
+            <th>状态</th>
+            <th>时间</th>
+            <th>玩家</th>
+            <th>平均分</th>
+            <th>奖励</th>
+            <th>操作</th>
+          </tr></thead>
+          <tbody>
+          <% seasons.forEach(function(s) { %>
+            <% var gameIcon = { chess: '♟️', gomoku: '⚫', go: '⚪' }; %>
+            <% var gameName = { chess: '国际象棋', gomoku: '五子棋', go: '围棋' }; %>
+            <tr>
+              <td><%= gameIcon[s.game_type] || '🎮' %> <%= gameName[s.game_type] || s.game_type %></td>
+              <td><span class="badge badge-season">S<%= s.season_number %></span></td>
+              <td><strong><%= s.name || '-' %></strong></td>
+              <td>
+                <% if (s.status === 'active') { %>
+                  <span class="badge badge-active"><span class="status-indicator active"></span>进行中</span>
+                <% } else if (s.status === 'ended') { %>
+                  <span class="badge badge-ended"><span class="status-indicator ended"></span>已结束</span>
+                <% } else { %>
+                  <span class="badge badge-inactive"><span class="status-indicator inactive"></span>未激活</span>
+                <% } %>
+              </td>
+              <td style="font-size:12px;color:#6b7280">
+                <%= s.start_date ? s.start_date.slice(0,10) : '?' %> ~ <%= s.end_date ? s.end_date.slice(0,10) : '?' %>
+              </td>
+              <td><%= s.player_count %></td>
+              <td><%= s.avg_rating ? Math.round(s.avg_rating) : '-' %></td>
+              <td style="font-size:12px;color:#6b7280">
+                <% if (s.reward_first) { %>🥇<%= s.reward_first %><% } %>
+                <% if (s.reward_second) { %> / 🥈<%= s.reward_second %><% } %>
+                <% if (s.reward_third) { %> / 🥉<%= s.reward_third %><% } %>
+                <% if (!s.reward_first && !s.reward_second && !s.reward_third) { %>-<% } %>
+              </td>
+              <td>
+                <div class="action-group">
+                  <button class="btn btn-sm btn-primary" onclick="openEditModal(<%= s.id %>)">✏️ 编辑</button>
+                  <button class="btn btn-sm btn-success" onclick="openRewardModal(<%= s.id %>)">🎁 发奖</button>
+                  <button class="btn btn-sm btn-warning" onclick="confirmReset('<%= s.game_type %>')">🔄 重置</button>
+                  <button class="btn btn-sm btn-danger" onclick="confirmDelete(<%= s.id %>)">🗑️ 删除</button>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <!-- 提示：赛季数据说明 -->
+    <div class="card" style="background:#f0f9ff;border:1px solid #bae6fd">
+      <h2 style="font-size:14px;color:#0369a1">📌 说明</h2>
+      <ul style="font-size:13px;color:#475569;line-height:1.8;padding-left:18px">
+        <li><strong>创建赛季</strong>：手动添加新赛季配置，设置名称、时间、奖励等信息</li>
+        <li><strong>编辑赛季</strong>：修改赛季名称、状态、时间范围、奖励配置等</li>
+        <li><strong>重置赛季</strong>：将当前赛季数据复制为新赛季，Rating 重置为 1500，段位重新计算</li>
+        <li><strong>删除赛季</strong>：删除赛季配置（不影响玩家 Rating 数据）</li>
+        <li>状态 <span class="badge badge-active">进行中</span> 表示该赛季当前有效，<span class="badge badge-ended">已结束</span> 表示赛季已结束</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 创建赛季 Modal -->
+  <div class="modal-overlay" id="createModal">
+    <div class="modal">
+      <h3>➕ 创建新赛季</h3>
+      <div class="form-row">
+        <label>游戏类型 *</label>
+        <select id="create_game_type">
+          <option value="chess">♟️ 国际象棋</option>
+          <option value="gomoku">⚫ 五子棋</option>
+          <option value="go">⚪ 围棋</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>赛季号 *</label>
+        <input type="number" id="create_season_number" min="1" step="1" placeholder="例如 1, 2, 3...">
+        <span class="hint">建议与 Glicko2 数据中的赛季号一致</span>
+      </div>
+      <div class="form-row">
+        <label>赛季名称</label>
+        <input type="text" id="create_name" placeholder="例：S1 勇者赛季">
+      </div>
+      <div class="form-row">
+        <label>描述</label>
+        <textarea id="create_description" placeholder="赛季描述，显示在玩家端"></textarea>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>开始日期</label>
+          <input type="date" id="create_start_date">
+        </div>
+        <div class="form-row">
+          <label>结束日期</label>
+          <input type="date" id="create_end_date">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>状态</label>
+        <select id="create_status">
+          <option value="inactive">未激活</option>
+          <option value="active" selected>进行中</option>
+          <option value="ended">已结束</option>
+        </select>
+      </div>
+      <div class="form-row" style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:4px">
+        <label style="font-weight:600;color:#374151">🎁 赛季奖励配置</label>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>🥇 第一名奖励</label>
+          <input type="text" id="create_reward_first" placeholder="例如：限定称号">
+        </div>
+        <div class="form-row">
+          <label>🥈 第二名奖励</label>
+          <input type="text" id="create_reward_second" placeholder="例如：稀有头像框">
+        </div>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>🥉 第三名奖励</label>
+          <input type="text" id="create_reward_third" placeholder="例如：金币×1000">
+        </div>
+        <div class="form-row">
+          <label>最低 Rating</label>
+          <input type="number" id="create_min_rating" value="0" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>最高 Rating</label>
+        <input type="number" id="create_max_rating" value="9999" min="0">
+      </div>
+      <div class="btn-group">
+        <button class="btn" style="background:#f3f4f6;color:#374151" onclick="closeModal('createModal')">取消</button>
+        <button class="btn btn-success" onclick="doCreate()">✅ 创建赛季</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑赛季 Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>✏️ 编辑赛季</h3>
+      <input type="hidden" id="edit_id">
+      <div class="form-row">
+        <label>赛季名称</label>
+        <input type="text" id="edit_name" placeholder="例：S1 勇者赛季">
+      </div>
+      <div class="form-row">
+        <label>描述</label>
+        <textarea id="edit_description" placeholder="赛季描述"></textarea>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>开始日期</label>
+          <input type="date" id="edit_start_date">
+        </div>
+        <div class="form-row">
+          <label>结束日期</label>
+          <input type="date" id="edit_end_date">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>状态</label>
+        <select id="edit_status">
+          <option value="inactive">未激活</option>
+          <option value="active">进行中</option>
+          <option value="ended">已结束</option>
+        </select>
+      </div>
+      <div class="form-row" style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:4px">
+        <label style="font-weight:600;color:#374151">🎁 赛季奖励配置</label>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>🥇 第一名奖励</label>
+          <input type="text" id="edit_reward_first" placeholder="例如：限定称号">
+        </div>
+        <div class="form-row">
+          <label>🥈 第二名奖励</label>
+          <input type="text" id="edit_reward_second" placeholder="例如：稀有头像框">
+        </div>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>🥉 第三名奖励</label>
+          <input type="text" id="edit_reward_third" placeholder="例如：金币×1000">
+        </div>
+        <div class="form-row">
+          <label>最低 Rating</label>
+          <input type="number" id="edit_min_rating" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>最高 Rating</label>
+        <input type="number" id="edit_max_rating" min="0">
+      </div>
+      <div class="btn-group">
+        <button class="btn" style="background:#f3f4f6;color:#374151" onclick="closeModal('editModal')">取消</button>
+        <button class="btn btn-primary" onclick="doUpdate()">💾 保存更改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 重置确认 Modal -->
+  <div class="modal-overlay" id="resetModal">
+    <div class="modal">
+      <h3>⚠️ 确认重置赛季</h3>
+      <p id="resetDesc">确定要重置该游戏类型的赛季吗？当前赛季数据将保留，新赛季将以 1500 Rating 重新开始。</p>
+      <div class="btn-group">
+        <button class="btn" style="background:#f3f4f6;color:#374151" onclick="closeModal('resetModal')">取消</button>
+        <button class="btn btn-sm btn-danger" id="confirmResetBtn" onclick="doReset()">确认重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认 Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+      <h3>⚠️ 确认删除赛季</h3>
+      <p>确定要删除该赛季配置吗？此操作不会影响玩家的 Rating 数据。</p>
+      <div class="btn-group">
+        <button class="btn" style="background:#f3f4f6;color:#374151" onclick="closeModal('deleteModal')">取消</button>
+        <button class="btn btn-sm btn-danger" id="confirmDeleteBtn" onclick="doDelete()">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 发放奖励 Modal -->
+  <div class="modal-overlay" id="rewardModal" style="align-items:flex-start;padding-top:40px">
+    <div class="modal" style="max-width:620px">
+      <h3>🎁 发放赛季奖励</h3>
+      <p id="rewardDesc">加载赛季排名数据中...</p>
+      <div id="rewardLoading" style="text-align:center;padding:30px;color:#9ca3af">⏳ 加载中...</div>
+      <div id="rewardContent" style="display:none">
+        <div style="margin-bottom:14px;padding:10px 14px;background:#f0f9ff;border-radius:10px;border:1px solid #bae6fd;font-size:13px;color:#0369a1">
+          ⚠️ 请仔细核对排名和奖励内容，确认无误后点击"确认发放"
+        </div>
+        <div style="max-height:300px;overflow-y:auto;margin-bottom:14px">
+          <table style="width:100%">
+            <thead><tr><th style="width:40px">排名</th><th>玩家</th><th>Rating</th><th>称号</th><th style="width:100px">金币奖励</th><th style="width:120px">发放称号</th></tr></thead>
+            <tbody id="rewardRankings"></tbody>
+          </table>
+        </div>
+        <div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:4px">
+          <div class="form-row">
+            <label>🎯 批量设置（将应用到所有选中行）</label>
+          </div>
+          <div class="form-row-inline">
+            <div class="form-row">
+              <label>统一金币</label>
+              <input type="number" id="rewardBatchCoins" value="0" min="0" step="100" onchange="applyBatchRewardSettings()">
+            </div>
+            <div class="form-row">
+              <label>统一称号前缀</label>
+              <input type="text" id="rewardBatchTitle" placeholder="例如：S1" onchange="applyBatchRewardSettings()">
+            </div>
+          </div>
+          <div class="form-row" style="font-size:12px;color:#6b7280">
+            💡 称号格式：前缀 + 排名后缀（冠军/亚军/季军/第N名）。例如前缀填"S1"则自动生成"S1冠军"、"S1亚军"...
+          </div>
+        </div>
+      </div>
+      <div class="btn-group" id="rewardActions" style="display:none">
+        <button class="btn" style="background:#f3f4f6;color:#374151" onclick="closeModal('rewardModal')">取消</button>
+        <button class="btn btn-danger" onclick="confirmIssueRewards()">⚠️ 确认发放</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认发放 Modal -->
+  <div class="modal-overlay" id="confirmRewardModal">
+    <div class="modal">
+      <h3>⚠️ 最终确认</h3>
+      <p id="confirmRewardDesc">请确认以下奖励信息无误：</p>
+      <div id="confirmRewardSummary" style="background:#f9fafb;border-radius:10px;padding:14px;font-size:13px;line-height:1.8;margin-bottom:14px"></div>
+      <p style="color:#dc2626;font-size:13px;font-weight:600">⚠️ 此操作不可撤销！确认后金币和称号将直接发放到玩家账户。</p>
+      <div class="btn-group">
+        <button class="btn" style="background:#f3f4f6;color:#374151" onclick="closeModal('confirmRewardModal')">返回修改</button>
+        <button class="btn btn-success" id="finalRewardBtn" onclick="doIssueRewards()">✅ 确认发放</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let resetGameType = '';
+    let deleteSeasonId = null;
+
+    // Get CSRF token from EJS
+    var csrfToken = '<%= csrfToken %>';
+
+    // Season data for edit modal
+    var seasonsData = <%- JSON.stringify(seasons) %>;
+
+    function showToast(msg, type) {
+      var t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 3000);
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    // ---- Create ----
+    function openCreateModal() {
+      // Set default season number
+      var selects = document.querySelectorAll('#create_game_type option');
+      var maxSeason = 0;
+      seasonsData.forEach(function(s) {
+        if (s.season_number > maxSeason) maxSeason = s.season_number;
+      });
+      document.getElementById('create_season_number').value = maxSeason + 1;
+      document.getElementById('create_name').value = '';
+      document.getElementById('create_description').value = '';
+      document.getElementById('create_start_date').value = '';
+      document.getElementById('create_end_date').value = '';
+      document.getElementById('create_reward_first').value = '';
+      document.getElementById('create_reward_second').value = '';
+      document.getElementById('create_reward_third').value = '';
+      document.getElementById('create_min_rating').value = 0;
+      document.getElementById('create_max_rating').value = 9999;
+      openModal('createModal');
+    }
+
+    function doCreate() {
+      var data = {
+        game_type: document.getElementById('create_game_type').value,
+        season_number: parseInt(document.getElementById('create_season_number').value) || 0,
+        name: document.getElementById('create_name').value,
+        description: document.getElementById('create_description').value,
+        start_date: document.getElementById('create_start_date').value,
+        end_date: document.getElementById('create_end_date').value,
+        status: document.getElementById('create_status').value,
+        reward_first: document.getElementById('create_reward_first').value,
+        reward_second: document.getElementById('create_reward_second').value,
+        reward_third: document.getElementById('create_reward_third').value,
+        min_rating: parseInt(document.getElementById('create_min_rating').value) || 0,
+        max_rating: parseInt(document.getElementById('create_max_rating').value) || 9999,
+        _csrf: csrfToken
+      };
+      if (!data.season_number) { showToast('请输入赛季号', 'error'); return; }
+      fetch('/admin/games/seasons/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+          showToast('赛季创建成功！', 'success');
+          closeModal('createModal');
+          setTimeout(function() { location.reload(); }, 500);
+        } else {
+          showToast('创建失败：' + (d.error || '未知错误'), 'error');
+        }
+      }).catch(function() { showToast('网络错误', 'error'); });
+    }
+
+    // ---- Edit ----
+    function openEditModal(id) {
+      var s = seasonsData.find(function(x) { return x.id === id; });
+      if (!s) { showToast('赛季数据未找到', 'error'); return; }
+      document.getElementById('edit_id').value = s.id;
+      document.getElementById('edit_name').value = s.name || '';
+      document.getElementById('edit_description').value = s.description || '';
+      document.getElementById('edit_start_date').value = s.start_date ? s.start_date.slice(0,10) : '';
+      document.getElementById('edit_end_date').value = s.end_date ? s.end_date.slice(0,10) : '';
+      document.getElementById('edit_status').value = s.status || 'inactive';
+      document.getElementById('edit_reward_first').value = s.reward_first || '';
+      document.getElementById('edit_reward_second').value = s.reward_second || '';
+      document.getElementById('edit_reward_third').value = s.reward_third || '';
+      document.getElementById('edit_min_rating').value = s.min_rating || 0;
+      document.getElementById('edit_max_rating').value = s.max_rating || 9999;
+      openModal('editModal');
+    }
+
+    function doUpdate() {
+      var id = parseInt(document.getElementById('edit_id').value);
+      var data = {
+        id: id,
+        name: document.getElementById('edit_name').value,
+        description: document.getElementById('edit_description').value,
+        start_date: document.getElementById('edit_start_date').value,
+        end_date: document.getElementById('edit_end_date').value,
+        status: document.getElementById('edit_status').value,
+        reward_first: document.getElementById('edit_reward_first').value,
+        reward_second: document.getElementById('edit_reward_second').value,
+        reward_third: document.getElementById('edit_reward_third').value,
+        min_rating: parseInt(document.getElementById('edit_min_rating').value) || 0,
+        max_rating: parseInt(document.getElementById('edit_max_rating').value) || 9999,
+        _csrf: csrfToken
+      };
+      fetch('/admin/games/seasons/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+          showToast('赛季更新成功！', 'success');
+          closeModal('editModal');
+          setTimeout(function() { location.reload(); }, 500);
+        } else {
+          showToast('更新失败：' + (d.error || '未知错误'), 'error');
+        }
+      }).catch(function() { showToast('网络错误', 'error'); });
+    }
+
+    // ---- Reset ----
+    function confirmReset(gameType) {
+      resetGameType = gameType;
+      var names = { chess: '国际象棋', gomoku: '五子棋', go: '围棋' };
+      document.getElementById('resetDesc').textContent = '确定要重置「' + (names[gameType] || gameType) + '」的赛季吗？当前赛季数据将保留，新赛季将以 1500 Rating 重新开始，并自动创建赛季配置。';
+      openModal('resetModal');
+    }
+
+    function doReset() {
+      if (!resetGameType) return;
+      var btn = document.getElementById('confirmResetBtn');
+      btn.disabled = true;
+      btn.textContent = '处理中...';
+      fetch('/admin/games/seasons/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_type: resetGameType, _csrf: csrfToken })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok) {
+          showToast('新赛季 S' + data.newSeason + ' 已创建！', 'success');
+          closeModal('resetModal');
+          setTimeout(function() { location.reload(); }, 500);
+        } else {
+          showToast('操作失败：' + (data.error || '未知错误'), 'error');
+        }
+      }).catch(function() { showToast('网络错误', 'error'); }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = '确认重置';
+      });
+    }
+
+    // ---- Delete ----
+    function confirmDelete(id) {
+      deleteSeasonId = id;
+      openModal('deleteModal');
+    }
+
+    function doDelete() {
+      if (!deleteSeasonId) return;
+      var btn = document.getElementById('confirmDeleteBtn');
+      btn.disabled = true;
+      btn.textContent = '处理中...';
+      fetch('/admin/games/seasons/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteSeasonId, _csrf: csrfToken })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok) {
+          showToast('赛季已删除', 'success');
+          closeModal('deleteModal');
+          setTimeout(function() { location.reload(); }, 500);
+        } else {
+          showToast('删除失败：' + (data.error || '未知错误'), 'error');
+        }
+      }).catch(function() { showToast('网络错误', 'error'); }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = '确认删除';
+      });
+    }
+
+    // ===== 奖励发放 =====
+    var rewardSeasonId = null;
+    var rewardSeasonData = null;
+    var rewardRankingsData = [];
+    var rewardConfig = [];
+
+    function openRewardModal(id) {
+      var s = seasonsData.find(function(x) { return x.id === id; });
+      if (!s) { showToast('赛季数据未找到', 'error'); return; }
+      rewardSeasonId = id;
+      rewardSeasonData = s;
+      rewardRankingsData = [];
+      rewardConfig = [];
+
+      document.getElementById('rewardDesc').textContent = '🎮 ' + (s.game_type === 'chess' ? '♟️ 国际象棋' : s.game_type === 'gomoku' ? '⚫ 五子棋' : '⚪ 围棋') + ' S' + s.season_number + ' - ' + (s.name || '未命名赛季');
+      document.getElementById('rewardLoading').style.display = 'block';
+      document.getElementById('rewardContent').style.display = 'none';
+      document.getElementById('rewardActions').style.display = 'none';
+      document.getElementById('rewardBatchCoins').value = 0;
+      document.getElementById('rewardBatchTitle').value = '';
+      openModal('rewardModal');
+
+      fetch('/admin/games/seasons/rankings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_type: s.game_type, season_number: s.season_number, _csrf: csrfToken })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        document.getElementById('rewardLoading').style.display = 'none';
+        if (data.ok && data.rankings.length > 0) {
+          rewardRankingsData = data.rankings;
+          renderRewardRankings();
+          document.getElementById('rewardContent').style.display = 'block';
+          document.getElementById('rewardActions').style.display = 'flex';
+        } else {
+          document.getElementById('rewardContent').innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">暂无排名数据</div>';
+          document.getElementById('rewardContent').style.display = 'block';
+        }
+      }).catch(function() {
+        document.getElementById('rewardLoading').style.display = 'none';
+        showToast('加载排名失败', 'error');
+      });
+    }
+
+    function renderRewardRankings() {
+      var tbody = document.getElementById('rewardRankings');
+      var rankNames = ['冠军', '亚军', '季军'];
+      tbody.innerHTML = '';
+      rewardConfig = [];
+
+      rewardRankingsData.forEach(function(player, i) {
+        var rank = i + 1;
+        var defaultCoins = rank === 1 ? 5000 : rank === 2 ? 3000 : rank === 3 ? 1000 : 500;
+        var defaultTitle = rank <= 3 ? rankNames[i] : '第' + rank + '名';
+        var cfg = {
+          rank: rank,
+          user_id: player.user_id,
+          username: player.username,
+          coins: defaultCoins,
+          title: defaultTitle
+        };
+        rewardConfig.push(cfg);
+
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td style="text-align:center;font-weight:700;font-size:15px">' +
+          (rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank) + '</td>' +
+          '<td><strong>' + escHtml(player.username) + '</strong><br><span style="font-size:11px;color:#6b7280">ID: ' + player.user_id + '</span></td>' +
+          '<td>' + Math.round(player.rating) + '</td>' +
+          '<td>' + (player.title || '-') + '</td>' +
+          '<td><input type="number" class="reward-coin-input" data-idx="' + i + '" value="' + defaultCoins + '" min="0" step="100" style="width:90px;padding:6px 8px;border:2px solid #e5e7eb;border-radius:8px;font-size:12px" onchange="updateRewardConfig(' + i + ', this.value, null)"></td>' +
+          '<td><input type="text" class="reward-title-input" data-idx="' + i + '" value="' + escHtml(defaultTitle) + '" style="width:115px;padding:6px 8px;border:2px solid #e5e7eb;border-radius:8px;font-size:12px" onchange="updateRewardConfig(' + i + ', null, this.value)"></td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateRewardConfig(idx, coins, title) {
+      if (idx >= rewardConfig.length) return;
+      if (coins !== null) rewardConfig[idx].coins = parseInt(coins) || 0;
+      if (title !== null) rewardConfig[idx].title = title;
+    }
+
+    function applyBatchRewardSettings() {
+      var batchCoins = parseInt(document.getElementById('rewardBatchCoins').value) || 0;
+      var batchTitle = document.getElementById('rewardBatchTitle').value;
+      var rankNames = ['冠军', '亚军', '季军'];
+
+      document.querySelectorAll('.reward-coin-input').forEach(function(input) {
+        var idx = parseInt(input.dataset.idx);
+        if (batchCoins > 0) {
+          input.value = batchCoins;
+          rewardConfig[idx].coins = batchCoins;
+        }
+      });
+
+      if (batchTitle) {
+        document.querySelectorAll('.reward-title-input').forEach(function(input) {
+          var idx = parseInt(input.dataset.idx);
+          var rank = idx + 1;
+          var title = batchTitle + (rank <= 3 ? rankNames[idx] : '第' + rank + '名');
+          input.value = title;
+          rewardConfig[idx].title = title;
+        });
+      }
+    }
+
+    function confirmIssueRewards() {
+      if (!rewardConfig || rewardConfig.length === 0) {
+        showToast('没有可发放的奖励', 'error');
+        return;
+      }
+
+      // Check if any rewards are configured
+      var hasRewards = rewardConfig.some(function(r) { return r.coins > 0 || r.title; });
+      if (!hasRewards) {
+        showToast('请至少设置金币或称号奖励', 'error');
+        return;
+      }
+
+      // Build summary
+      var s = rewardSeasonData;
+      var names = { chess: '♟️ 国际象棋', gomoku: '⚫ 五子棋', go: '⚪ 围棋' };
+      var summary = '<div style="margin-bottom:8px;font-weight:600">' + (names[s.game_type] || s.game_type) + ' S' + s.season_number + '</div>';
+      summary += '<table style="width:100%;font-size:13px"><thead><tr><th>排名</th><th>玩家</th><th>金币</th><th>称号</th></tr></thead><tbody>';
+
+      rewardConfig.forEach(function(r) {
+        if (r.coins > 0 || r.title) {
+          summary += '<tr><td style="text-align:center">' + (r.rank <= 3 ? ['🥇','🥈','🥉'][r.rank-1] : '#' + r.rank) + '</td>';
+          summary += '<td>' + escHtml(r.username) + '</td>';
+          summary += '<td style="color:#10b981;font-weight:600">+' + r.coins + '</td>';
+          summary += '<td style="color:#8b5cf6;font-weight:600">' + escHtml(r.title) + '</td></tr>';
+        }
+      });
+
+      summary += '</tbody></table>';
+      document.getElementById('confirmRewardSummary').innerHTML = summary;
+      document.getElementById('confirmRewardDesc').textContent = '即将向以下玩家发放赛季奖励：';
+      closeModal('rewardModal');
+      openModal('confirmRewardModal');
+    }
+
+    function doIssueRewards() {
+      if (!rewardSeasonData) return;
+      var btn = document.getElementById('finalRewardBtn');
+      btn.disabled = true;
+      btn.textContent = '发放中...';
+
+      var rewards = rewardConfig.filter(function(r) { return r.coins > 0 || r.title; });
+
+      fetch('/admin/games/seasons/issue_rewards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          game_type: rewardSeasonData.game_type,
+          season_number: rewardSeasonData.season_number,
+          rewards: rewards,
+          _csrf: csrfToken
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok) {
+          showToast('✅ 奖励发放成功！共 ' + data.successCount + ' 人', 'success');
+          closeModal('confirmRewardModal');
+          setTimeout(function() { location.reload(); }, 500);
+        } else {
+          showToast('发放失败：' + (data.error || '未知错误'), 'error');
+        }
+      }).catch(function() { showToast('网络错误', 'error'); }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = '✅ 确认发放';
+      });
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

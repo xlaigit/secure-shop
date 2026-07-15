@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>游戏中心</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      color: #fff;
+    }
+    nav {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    nav a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    nav a:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    nav .brand {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-right: auto;
+    }
+    nav .balance {
+      background: rgba(255,215,0,0.15);
+      color: #ffd700;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+
+    .header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+    .header h1 {
+      font-size: 42px;
+      font-weight: 800;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header p {
+      color: rgba(255,255,255,0.6);
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 16px 28px;
+      text-align: center;
+      min-width: 140px;
+    }
+    .stat-card .num {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-card .label {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+    }
+    .game-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 36px 30px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .game-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      opacity: 0;
+      transition: opacity 0.3s;
+      border-radius: 24px;
+    }
+    .game-card:hover::before { opacity: 1; }
+    .game-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(255,215,0,0.3);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+
+    .game-card .icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .game-card h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+    }
+    .game-card p {
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+    .game-card .btn-play {
+      display: inline-block;
+      padding: 12px 36px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      position: relative;
+      z-index: 1;
+    }
+    .game-card .btn-play:hover {
+      transform: scale(1.05);
+    }
+    .game-card .tag {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 12px;
+    }
+
+    /* 游戏卡片颜色 */
+    .game-card.card-bj { background: linear-gradient(135deg, rgba(0,100,0,0.2), rgba(0,60,0,0.3)); }
+    .game-card.card-bj .btn-play { background: linear-gradient(90deg, #2ecc71, #27ae60); color: #fff; }
+    .game-card.card-bj .tag { background: rgba(46,204,113,0.2); color: #2ecc71; }
+
+    .game-card.card-wheel { background: linear-gradient(135deg, rgba(128,0,128,0.2), rgba(75,0,130,0.3)); }
+    .game-card.card-wheel .btn-play { background: linear-gradient(90deg, #e74c3c, #c0392b); color: #fff; }
+    .game-card.card-wheel .tag { background: rgba(231,76,60,0.2); color: #e74c3c; }
+
+    .game-card.card-dice { background: linear-gradient(135deg, rgba(128,0,128,0.15), rgba(45,27,105,0.3)); }
+    .game-card.card-dice .btn-play { background: linear-gradient(90deg, #f7971e, #ffd200); color: #000; }
+    .game-card.card-dice .tag { background: rgba(255,215,0,0.2); color: #ffd700; }
+
+    .game-card.card-slot { background: linear-gradient(135deg, rgba(100,0,0,0.2), rgba(74,0,0,0.3)); }
+    .game-card.card-slot .btn-play { background: linear-gradient(90deg, #e74c3c, #c0392b); color: #fff; }
+    .game-card.card-slot .tag { background: rgba(231,76,60,0.2); color: #e74c3c; }
+
+    .game-card.card-guess { background: linear-gradient(135deg, rgba(10,22,40,0.3), rgba(26,39,68,0.3)); }
+    .game-card.card-guess .btn-play { background: linear-gradient(90deg, #3498db, #2980b9); color: #fff; }
+    .game-card.card-guess .tag { background: rgba(52,152,219,0.2); color: #3498db; }
+
+    .game-card .badge-new {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: linear-gradient(90deg, #f7971e, #ffd200);
+      color: #000;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      z-index: 2;
+    }
+
+    .footer { text-align: center; margin-top: 60px; color: rgba(255,255,255,0.3); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/shop" class="brand">🎮 游戏中心</a>
+    <a href="/shop">🏪 商城</a>
+    <a href="/games/blackjack">🃏 21点</a>
+    <a href="/games/wheel">🎡 转盘</a>
+    <a href="/games/dice">🎲 骰子</a>
+    <a href="/games/slot">🎰 老虎机</a>
+    <a href="/games/guess">🔢 猜数字</a>
+    <a href="/games/fps">🔫 战术竞技场</a>
+    <a href="/games/chess">♟ 中国象棋</a>
+    <a href="/games/gomoku">⚫ 五子棋</a>
+    <a href="/games/go">⚪ 围棋</a>
+    <a href="/games/draw">🎨 你画我猜</a>
+    <span class="balance">💰 <%= user.balance.toFixed(2) %> 金币</span>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>🎮 游戏中心</h1>
+      <p>用虚拟币赢取更多奖励！每赢一局黑杰克可获得 1 积分 🎯</p>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="num"><%= stats.blackjack_wins || 0 %></div>
+        <div class="label">🏆 黑杰克胜利</div>
+      </div>
+      <div class="stat-card">
+        <div class="num"><%= stats.blackjack_games || 0 %></div>
+        <div class="label">🃏 黑杰克局数</div>
+      </div>
+      <div class="stat-card">
+        <div class="num"><%= (stats.blackjack_net || 0) > 0 ? '+' : '' %><%= (stats.blackjack_net || 0).toFixed(0) %></div>
+        <div class="label">💰 黑杰克净盈亏</div>
+      </div>
+      <div class="stat-card">
+        <div class="num"><%= stats.wheel_spins || 0 %></div>
+        <div class="label">🎡 转盘次数</div>
+      </div>
+    </div>
+
+    <div class="games-grid">
+      <div class="game-card card-bj" onclick="location.href='/games/blackjack'">
+        <div class="badge-new">🔥 热门</div>
+        <div class="icon">🃏</div>
+        <span class="tag">策略 · 卡牌</span>
+        <h2>21点 (Blackjack)</h2>
+        <p>经典赌场扑克游戏！目标是手牌点数比庄家更接近21点，<br>但不能超过21点。黑杰克（A+10）3倍赔付！</p>
+        <a href="/games/blackjack" class="btn-play">开始游戏</a>
+      </div>
+
+      <div class="game-card card-wheel" onclick="location.href='/games/wheel'">
+        <div class="badge-new">🎁 免费</div>
+        <div class="icon">🎡</div>
+        <span class="tag">运气 · 每日</span>
+        <h2>幸运大转盘</h2>
+        <p>每天一次免费转盘机会！赢取金币、积分、优惠券等奖励。<br>运气好的话最高可获 500 金币！</p>
+        <a href="/games/wheel" class="btn-play">开始游戏</a>
+      </div>
+
+      <div class="game-card card-dice" onclick="location.href='/games/dice'">
+        <div class="icon">🎲</div>
+        <span class="tag">运气 · 快速</span>
+        <h2>骰子游戏</h2>
+        <p>猜骰子点数 1-6，猜中即赢 5 倍赔付！<br>简单快速，一局只需几秒钟。</p>
+        <a href="/games/dice" class="btn-play">开始游戏</a>
+      </div>
+
+      <div class="game-card card-slot" onclick="location.href='/games/slot'">
+        <div class="badge-new">💰 大奖</div>
+        <div class="icon">🎰</div>
+        <span class="tag">运气 · 老虎机</span>
+        <h2>老虎机</h2>
+        <p>经典老虎机！三个相同符号赢大奖，<br>最高 50 倍赔付！试试你的运气吧！</p>
+        <a href="/games/slot" class="btn-play">开始游戏</a>
+      </div>
+
+      <div class="game-card card-guess" onclick="location.href='/games/guess'">
+        <div class="icon">🔢</div>
+        <span class="tag">策略 · 推理</span>
+        <h2>猜数字</h2>
+        <p>在 5 次机会内猜中 1-100 之间的数字，<br>每次猜错会提示高了还是低了，赢 3 倍赔付！</p>
+        <a href="/games/guess" class="btn-play">开始游戏</a>
+      </div>
+
+      <div class="game-card card-fps" onclick="location.href='/games/fps'" style="background:linear-gradient(135deg,rgba(180,0,0,0.25),rgba(60,0,0,0.35))">
+        <div class="badge-new">🆕 全新</div>
+        <div class="icon">🔫</div>
+        <span class="tag">3D · AI 对战</span>
+        <h2>战术竞技场</h2>
+        <p>第一人称 3D 枪战！AI 敌人会包抄、寻找掩体、协同作战。<br>5 档难度（新兵→特种），波次生存，挑战你的极限！</p>
+        <a href="/games/fps" class="btn-play" style="background:linear-gradient(90deg,#ff4444,#cc0000);color:#fff">开始战斗</a>
+      </div>
+
+      <div class="game-card" style="background:linear-gradient(135deg,rgba(180,0,0,0.2),rgba(120,0,0,0.3))" onclick="location.href='/games/chess'">
+        <div class="badge-new">🆕 全新</div>
+        <div class="icon">♟</div>
+        <span class="tag">联机 · 策略 · 段位</span>
+        <h2>中国象棋</h2>
+        <p>经典中国象棋联机对战！Glicko2 动态积分，<br>天梯竞技/休闲匹配，段位系统，好友对战房间。</p>
+        <a href="/games/chess" class="btn-play" style="background:linear-gradient(90deg,#d4af37,#bf942c);color:#000">开始对弈</a>
+      </div>
+
+      <div class="game-card" style="background:linear-gradient(135deg,rgba(0,0,0,0.3),rgba(30,30,30,0.4))" onclick="location.href='/games/gomoku'">
+        <div class="badge-new">🆕 全新</div>
+        <div class="icon">⚫</div>
+        <span class="tag">联机 · 策略 · 段位</span>
+        <h2>五子棋</h2>
+        <p>经典五子棋联机对战！匹配动画、段位系统、<br>好友对战、聊天系统，五子连珠，智者为王！</p>
+        <a href="/games/gomoku" class="btn-play" style="background:linear-gradient(90deg,#555,#333);color:#fff">开始对弈</a>
+      </div>
+
+      <div class="game-card" style="background:linear-gradient(135deg,rgba(30,30,30,0.3),rgba(50,40,20,0.3))" onclick="location.href='/games/go'">
+        <div class="badge-new">🆕 全新</div>
+        <div class="icon">⚪</div>
+        <span class="tag">联机 · 策略 · 段位</span>
+        <h2>围棋</h2>
+        <p>经典围棋联机对战！9/13/19 路棋盘可选，<br>贴目设置，Glicko2 段位系统，天梯匹配。</p>
+        <a href="/games/go" class="btn-play" style="background:linear-gradient(90deg,#666,#444);color:#fff">开始对弈</a>
+      </div>
+
+      <div class="game-card" style="background:linear-gradient(135deg,rgba(80,40,120,0.25),rgba(40,20,80,0.35))" onclick="location.href='/games/draw'">
+        <div class="badge-new">🆕 全新</div>
+        <div class="icon">🎨</div>
+        <span class="tag">创意 · 联机 · AI</span>
+        <h2>你画我猜</h2>
+        <p>你画AI猜 / AI画你猜 / 卧底绘画局 / 主题闯关！<br>画布工具齐全，多人联机投票找出卧底！</p>
+        <a href="/games/draw" class="btn-play" style="background:linear-gradient(90deg,#8b5cf6,#6d28d9);color:#fff">开始游戏</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>游戏仅供娱乐，使用虚拟货币，祝你好运！</p>
+    </div>
+  </div>
+</body>
+</html>

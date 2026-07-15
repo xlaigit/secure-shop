@@ -58,6 +58,7 @@
     <div class="card">
       <h2>➕ 创建优惠券</h2>
       <form method="POST" action="/admin/coupons/create">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="form-row">
           <div>
             <label>优惠码</label>
@@ -118,6 +119,7 @@
             </td>
             <td>
               <form method="POST" action="/admin/coupons/delete/<%= c.id %>" style="display:inline" onsubmit="return confirm('删除此优惠券？')">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button class="btn btn-danger" type="submit">🗑 删除</button>
               </form>
             </td>

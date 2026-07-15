@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安全练习商城 · 我的收藏</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f9fafb 0%,#e5e7eb 100%);min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:10}
+    .nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.3px}
+    .nav .brand-icon{width:36px;height:36px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+    .nav .brand-icon svg{width:18px;height:18px;color:white}
+    .nav .menu{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+    .nav .menu a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all 0.15s}
+    .nav .menu a:hover{background:#f3f4f6;color:#667eea}
+    .nav .menu a.active{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .nav .menu a.danger{color:#dc2626}
+    .nav .menu a.danger:hover{background:#fef2f2;color:#991b1b}
+    .container{max-width:1200px;margin:0 auto;padding:24px 28px}
+    .section-header{display:flex;justify-content:space-between;align-items:center;margin:8px 0 20px;flex-wrap:wrap;gap:12px}
+    .section-header h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+    .section-header .count{background:#f3f4f6;color:#4b5563;padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
+    .wishlist-loading{background:white;border-radius:16px;padding:60px 28px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .wishlist-loading .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top:4px solid #667eea;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .wishlist-loading p{color:#6b7280;font-size:14px}
+    .empty{background:white;border-radius:16px;padding:60px 28px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .empty .ico{font-size:48px;margin-bottom:12px;opacity:0.5}
+    .empty h3{font-size:18px;font-weight:600;margin-bottom:8px;color:#1f2937}
+    .empty p{color:#6b7280;font-size:14px;margin-bottom:16px}
+    .empty .btn-go-shop{display:inline-block;padding:10px 24px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.2s;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .empty .btn-go-shop:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(102,126,234,0.35)}
+    .wishlist-list{display:flex;flex-direction:column;gap:14px}
+    .wishlist-item{background:white;border-radius:16px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.2s;border:2px solid transparent;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+    .wishlist-item:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,0.1);border-color:#e5e7eb}
+    .wishlist-item .info{flex:1;min-width:200px}
+    .wishlist-item .info .cat{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:600;margin-bottom:8px}
+    .wishlist-item .info .cat.official{background:#dbeafe;color:#1e40af}
+    .wishlist-item .info .cat.shop{background:#d1fae5;color:#065f46}
+    .wishlist-item .info h3{font-size:17px;font-weight:700;color:#111827;letter-spacing:-0.2px;line-height:1.4;margin-bottom:6px}
+    .wishlist-item .info .source{font-size:13px;color:#6b7280;margin-bottom:6px}
+    .wishlist-item .info .source strong{color:#374151}
+    .wishlist-item .info .price{font-size:24px;font-weight:700;color:#667eea;letter-spacing:-0.5px;margin-bottom:6px}
+    .wishlist-item .info .price::before{content:'¥';font-size:16px;font-weight:600;margin-right:2px}
+    .wishlist-item .info .rating{font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px}
+    .wishlist-item .info .rating .stars{color:#f59e0b;letter-spacing:1px}
+    .wishlist-item .info .rating .count{color:#9ca3af;font-size:12px}
+    .wishlist-item .actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+    .btn{padding:10px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;justify-content:center;white-space:nowrap}
+    .btn-wishlist{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+    .btn-wishlist:hover{background:#fee2e2;border-color:#fca5a5;color:#991b1b;transform:translateY(-1px)}
+    .btn-cart{background:linear-gradient(135deg,#667eea,#764ba2);color:white;box-shadow:0 4px 12px rgba(102,126,234,0.25)}
+    .btn-cart:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(102,126,234,0.35)}
+    .toast{position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s}
+    .toast.error{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    @keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}
+    @media (max-width:768px){.nav{padding:12px 16px}.container{padding:18px 16px}.wishlist-item{padding:16px 18px}.wishlist-item .info h3{font-size:15px}.wishlist-item .info .price{font-size:20px}.wishlist-item .actions{flex-direction:row;width:100%}.btn{flex:1;padding:10px 12px;font-size:12px}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <span>安全练习商城</span>
+    </div>
+    <div class="menu">
+      <a href="/shop">🛒 商城</a>
+      <a href="/orders">📋 订单</a>
+      <a href="/billing">💰 账单</a>
+      <a href="/friends">👥 好友</a>
+      <a href="/chat" style="position:relative">💬 群聊<span id="chatBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/shop/create">🏪 开店</a>
+      <a href="/shop/manage">📦 我的店铺</a>
+      <a href="/cloud">☁️ 文件云盘</a>
+      <a href="/notifications" style="position:relative">📨 通知<span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/appeal">📝 申诉</a>
+      <a href="/profile">👤 头像</a>
+      <a class="danger" href="/logout">退出</a>
+      <a href="/redeem">兑换</a>
+      <a href="/track">📦 查快递</a>
+      <a href="/prompt-generator">🤖 AI生图</a>
+      <a href="/prompt-generator/gallery">🖼️ 画廊</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="section-header">
+      <h1>⭐ 我的收藏</h1>
+      <span class="count" id="wishlistCount">0 件</span>
+    </div>
+
+    <div id="wishlistContent">
+      <div class="wishlist-loading" id="loadingState">
+        <div class="spinner"></div>
+        <p>正在加载收藏列表...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+      var socket = io();
+      var container = document.getElementById('wishlistContent');
+      var countEl = document.getElementById('wishlistCount');
+
+      // 未读消息处理
+      socket.on('connect', function() {
+        socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '我的收藏' });
+        socket.emit('getUnread');
+      });
+      socket.on('unreadUpdate', function(data) {
+        var badge = document.getElementById('chatBadge');
+        if (!badge) return;
+        var total = data.privateUnread || 0;
+        if (data.groups) data.groups.forEach(function(g) { total += g.unread || 0; });
+        badge.textContent = total > 99 ? '99+' : total;
+        badge.style.display = total > 0 ? 'inline-block' : 'none';
+      });
+      socket.on('groupUnread', function() {
+        socket.emit('getUnread');
+      });
+
+      // 实时通知
+      socket.on('newNotification', function(data) {
+        var badge = document.getElementById('notifBadge');
+        if (!badge) return;
+        var cur = parseInt(badge.textContent) || 0;
+        badge.textContent = cur >= 99 ? '99+' : (cur + 1);
+        badge.style.display = 'inline-block';
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s';
+        toast.innerHTML = '<div style="font-weight:700;margin-bottom:4px">' + data.title + '</div><div style="font-size:12px;opacity:0.9">' + data.content + '</div>';
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 4000);
+      });
+
+      // 购物车徽章更新
+      var cartBadge = null;
+      socket.on('cartUpdate', function(data) {
+        if (cartBadge === null) {
+          cartBadge = document.querySelector('.nav .menu a[href="/cart"] span');
+          if (!cartBadge) {
+            var cartLink = document.querySelector('.nav .menu a[href="/cart"]');
+            if (!cartLink) {
+              var allLinks = document.querySelectorAll('.nav .menu a');
+              for (var i = 0; i < allLinks.length; i++) {
+                if (allLinks[i].textContent.trim().indexOf('购物车') !== -1) {
+                  cartLink = allLinks[i];
+                  break;
+                }
+              }
+            }
+            if (cartLink) {
+              var existing = cartLink.querySelector('.cart-badge');
+              if (!existing) {
+                var badge = document.createElement('span');
+                badge.className = 'cart-badge';
+                badge.style.cssText = 'display:inline-block;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700;margin-left:4px';
+                cartLink.appendChild(badge);
+                cartBadge = badge;
+              } else {
+                cartBadge = existing;
+              }
+            }
+          }
+        }
+        if (cartBadge) {
+          var count = data.count || data.total || 0;
+          cartBadge.textContent = count > 99 ? '99+' : count;
+          cartBadge.style.display = count > 0 ? 'inline-block' : 'none';
+        }
+      });
+
+      // 显示提示消息
+      function showToast(msg, isError) {
+        var t = document.createElement('div');
+        t.className = 'toast' + (isError ? ' error' : '');
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 2500);
+      }
+
+      // 渲染收藏列表
+      function renderWishlist(items) {
+        if (!items || items.length === 0) {
+          container.innerHTML =
+            '<div class="empty">' +
+              '<div class="ico">💖</div>' +
+              '<h3>还没有收藏商品</h3>' +
+              '<p>去商城逛逛，发现喜欢的商品收藏起来吧</p>' +
+              '<a href="/shop" class="btn-go-shop">🛒 去逛逛</a>' +
+            '</div>';
+          countEl.textContent = '0 件';
+          return;
+        }
+
+        countEl.textContent = items.length + ' 件';
+        var html = '<div class="wishlist-list">';
+        items.forEach(function(p) {
+          var avg = Number(p.avg_rating || 0);
+          var fullStars = Math.round(avg);
+          var emptyStars = 5 - fullStars;
+          var catClass = p.shop_name ? 'shop' : 'official';
+          var catLabel = p.shop_name ? '🏪 商家商品' : '⭐ 官方推荐';
+          html +=
+            '<div class="wishlist-item" data-id="' + p.id + '">' +
+              '<div class="info">' +
+                '<span class="cat ' + catClass + '">' + catLabel + '</span>' +
+                '<h3>' + escapeHtml(p.name) + '</h3>' +
+                '<div class="source">来源：<strong>' + escapeHtml(p.shop_name || '官方商城') + '</strong></div>' +
+                '<div class="price">' + p.price + '</div>' +
+                '<div class="rating">' +
+                  '<span class="stars">' + '★'.repeat(fullStars) + '☆'.repeat(emptyStars) + '</span>' +
+                  '<span class="count">(' + (p.review_count || 0) + ' 条评价)</span>' +
+                '</div>' +
+              '</div>' +
+              '<div class="actions">' +
+                '<button class="btn btn-wishlist" onclick="removeWishlist(' + p.id + ')">❤️ 取消收藏</button>' +
+                '<button class="btn btn-cart" onclick="addToCart(' + p.id + ')">🛒 加入购物车</button>' +
+              '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      // HTML 转义
+      function escapeHtml(str) {
+        if (!str) return '';
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      // 加载收藏列表
+      function loadWishlist() {
+        container.innerHTML =
+          '<div class="wishlist-loading">' +
+            '<div class="spinner"></div>' +
+            '<p>正在加载收藏列表...</p>' +
+          '</div>';
+
+        fetch('/api/wishlist/list')
+          .then(function(res) {
+            if (!res.ok) throw new Error('请求失败');
+            return res.json();
+          })
+          .then(function(data) {
+            renderWishlist(data.items || data);
+          })
+          .catch(function(err) {
+            container.innerHTML =
+              '<div class="empty">' +
+                '<div class="ico">⚠️</div>' +
+                '<h3>加载失败</h3>' +
+                '<p>' + escapeHtml(err.message) + '</p>' +
+                '<button class="btn-go-shop" onclick="loadWishlist()">🔄 重试</button>' +
+              '</div>';
+          });
+      }
+
+      // 取消收藏
+      window.removeWishlist = function(productId) {
+        fetch('/api/wishlist/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: productId })
+        })
+        .then(function(res) {
+          if (!res.ok) throw new Error('操作失败');
+          return res.json();
+        })
+        .then(function(data) {
+          showToast('已取消收藏');
+          loadWishlist();
+        })
+        .catch(function(err) {
+          showToast(err.message, true);
+        });
+      };
+
+      // 加入购物车
+      window.addToCart = function(productId) {
+        fetch('/api/cart/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: productId })
+        })
+        .then(function(res) {
+          if (!res.ok) throw new Error('加入购物车失败');
+          return res.json();
+        })
+        .then(function(data) {
+          showToast('已加入购物车');
+          // 触发购物车徽章更新
+          socket.emit('cartUpdate', { count: data.count || data.total || 0 });
+        })
+        .catch(function(err) {
+          showToast(err.message, true);
+        });
+      };
+
+      // 启动
+      loadWishlist();
+    </script>
+</body>
+</html>

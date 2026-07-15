@@ -218,6 +218,8 @@ db.serialize(() => {
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  db.run(`ALTER TABLE announcements ADD COLUMN game_type TEXT DEFAULT 'all'`, () => {});
+  db.run(`ALTER TABLE announcements ADD COLUMN created_by INTEGER DEFAULT NULL`, () => {});
 
   // ========== 文件云盘 ==========
   db.run(`CREATE TABLE IF NOT EXISTS user_dir (
@@ -304,6 +306,286 @@ db.serialize(() => {
     cost_coin INTEGER NOT NULL DEFAULT 200,
     add_quota INTEGER NOT NULL DEFAULT 200000,
     buy_time DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 攻击日志表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS attack_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time TEXT NOT NULL,
+    ip TEXT NOT NULL,
+    method TEXT NOT NULL,
+    url TEXT NOT NULL,
+    attack_type TEXT NOT NULL,
+    user_agent TEXT DEFAULT '',
+    user_id INTEGER DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_attack_logs_time ON attack_logs (created_at)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_attack_logs_type ON attack_logs (attack_type)`);
+
+  // ========== 购物车表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS cart (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, product_id)
+  )`);
+
+  // ========== 收藏/心愿单表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS wishlist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, product_id)
+  )`);
+
+  // ========== 用户等级表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS user_levels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    level INTEGER DEFAULT 1,
+    total_spent REAL DEFAULT 0,
+    points INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 商品分类表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    icon TEXT DEFAULT '📦',
+    sort_order INTEGER DEFAULT 0
+  )`);
+  db.run(`ALTER TABLE products ADD COLUMN category_id INTEGER DEFAULT NULL`, () => {});
+  // 初始化默认分类
+  db.get("SELECT COUNT(*) as n FROM categories", (e, r) => {
+    if (r && r.n === 0) {
+      db.run("INSERT INTO categories (name, icon, sort_order) VALUES ('电子产品', '💻', 1)");
+      db.run("INSERT INTO categories (name, icon, sort_order) VALUES ('办公用品', '📎', 2)");
+      db.run("INSERT INTO categories (name, icon, sort_order) VALUES ('生活家居', '🏠', 3)");
+      db.run("INSERT INTO categories (name, icon, sort_order) VALUES ('其他', '📦', 4)");
+    }
+  });
+
+  // 用户表增加等级字段
+  db.run(`ALTER TABLE users ADD COLUMN user_level INTEGER DEFAULT 1`, () => {});
+  db.run(`ALTER TABLE users ADD COLUMN total_points INTEGER DEFAULT 0`, () => {});
+
+  // ========== 游戏系统表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_blackjack_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    bet_amount REAL NOT NULL,
+    result TEXT NOT NULL,
+    payout REAL NOT NULL,
+    player_hands TEXT DEFAULT '[]',
+    dealer_hand TEXT DEFAULT '[]',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS game_wheel_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    prize_name TEXT NOT NULL,
+    prize_type TEXT NOT NULL,
+    prize_value REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_game_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    blackjack_games INTEGER DEFAULT 0,
+    blackjack_wins INTEGER DEFAULT 0,
+    blackjack_losses INTEGER DEFAULT 0,
+    blackjack_pushes INTEGER DEFAULT 0,
+    blackjack_net REAL DEFAULT 0,
+    blackjack_points INTEGER DEFAULT 0,
+    wheel_spins INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== Glicko2 等级分表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_glicko2_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    game_type TEXT NOT NULL,
+    rating REAL DEFAULT 1500.0,
+    rd REAL DEFAULT 350.0,
+    volatility REAL DEFAULT 0.06,
+    games_played INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    draws INTEGER DEFAULT 0,
+    streak INTEGER DEFAULT 0,
+    season INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, game_type, season)
+  )`);
+
+  // ========== 赛季配置表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_seasons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_type TEXT NOT NULL,
+    season_number INTEGER NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    start_date TEXT DEFAULT '',
+    end_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'inactive',
+    reward_first TEXT DEFAULT '',
+    reward_second TEXT DEFAULT '',
+    reward_third TEXT DEFAULT '',
+    min_rating INTEGER DEFAULT 0,
+    max_rating INTEGER DEFAULT 9999,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(game_type, season_number)
+  )`);
+
+  // ========== 棋盘游戏对局记录表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_match_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_type TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    player1_id INTEGER NOT NULL,
+    player2_id INTEGER NOT NULL,
+    winner_id INTEGER DEFAULT NULL,
+    result TEXT DEFAULT '',
+    player1_rating_before REAL,
+    player2_rating_before REAL,
+    player1_rating_after REAL,
+    player2_rating_after REAL,
+    player1_rd_before REAL,
+    player2_rd_before REAL,
+    player1_rd_after REAL,
+    player2_rd_after REAL,
+    is_ranked INTEGER DEFAULT 1,
+    time_control TEXT DEFAULT 'standard',
+    move_count INTEGER DEFAULT 0,
+    pgn TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 游戏房间表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_rooms (
+    id TEXT PRIMARY KEY,
+    game_type TEXT NOT NULL,
+    player1_id INTEGER NOT NULL,
+    player2_id INTEGER DEFAULT NULL,
+    status TEXT DEFAULT 'waiting',
+    is_ranked INTEGER DEFAULT 1,
+    time_control TEXT DEFAULT 'standard',
+    is_private INTEGER DEFAULT 0,
+    password TEXT DEFAULT '',
+    board_state TEXT DEFAULT '',
+    current_turn INTEGER DEFAULT NULL,
+    move_history TEXT DEFAULT '[]',
+    started_at DATETIME DEFAULT NULL,
+    finished_at DATETIME DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 画画游戏记录表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_draw_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    mode TEXT NOT NULL,
+    word TEXT NOT NULL,
+    drawing_data TEXT DEFAULT '',
+    ai_guess_result TEXT DEFAULT '',
+    is_correct INTEGER DEFAULT 0,
+    score INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 画画卧底游戏房间表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_draw_undercover (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id TEXT NOT NULL,
+    word_common TEXT NOT NULL,
+    word_undercover TEXT NOT NULL,
+    player_count INTEGER DEFAULT 0,
+    round INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'playing',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 画画卧底游戏玩家表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_draw_undercover_players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    is_undercover INTEGER DEFAULT 0,
+    drawing_data TEXT DEFAULT '',
+    vote_target INTEGER DEFAULT NULL,
+    is_alive INTEGER DEFAULT 1,
+    UNIQUE(room_id, user_id)
+  )`);
+
+  // ========== FPS 游戏统计表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_fps_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    games_played INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    kills INTEGER DEFAULT 0,
+    deaths INTEGER DEFAULT 0,
+    headshots INTEGER DEFAULT 0,
+    highest_wave INTEGER DEFAULT 0,
+    highest_score INTEGER DEFAULT 0,
+    total_score INTEGER DEFAULT 0,
+    accuracy REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== FPS 对局记录表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_fps_match_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    match_type TEXT NOT NULL,
+    difficulty TEXT NOT NULL,
+    score INTEGER DEFAULT 0,
+    kills INTEGER DEFAULT 0,
+    deaths INTEGER DEFAULT 0,
+    headshots INTEGER DEFAULT 0,
+    accuracy REAL DEFAULT 0,
+    wave_reached INTEGER DEFAULT 0,
+    survived INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // ========== 赛季排行榜表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_season_leaderboard (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    game_type TEXT NOT NULL,
+    season INTEGER NOT NULL,
+    rating REAL DEFAULT 1500,
+    rank INTEGER DEFAULT 0,
+    tier TEXT DEFAULT 'beginner',
+    games_played INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, game_type, season)
+  )`);
+
+  // ========== 画画主题词库表 ==========
+  db.run(`CREATE TABLE IF NOT EXISTS game_draw_themes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    level INTEGER DEFAULT 1,
+    word TEXT NOT NULL,
+    hint TEXT DEFAULT '',
+    difficulty INTEGER DEFAULT 1,
+    UNIQUE(category, level)
   )`);
 
   // 默认管理员

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤝 邀请好友 · 安全练习商城</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:linear-gradient(150deg,#f0f4ff 0%,#faf0ff 40%,#fef7ed 100%);min-height:100vh;color:#1f2937}
+
+    /* ===== 导航栏 ===== */
+    .nav{background:rgba(255,255,255,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:12px 28px;box-shadow:0 1px 8px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:50;border-bottom:1px solid rgba(255,255,255,0.5)}
+    .nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:-0.3px;color:#1f2937}
+    .nav .brand-icon{width:34px;height:34px;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(99,102,241,0.3)}
+    .nav .brand-icon svg{width:18px;height:18px;color:white}
+    .nav .menu{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+    .nav .menu a{padding:7px 12px;text-decoration:none;color:#4b5563;border-radius:8px;font-size:13px;font-weight:500;transition:all 0.2s}
+    .nav .menu a:hover{background:#f3f4f6;color:#6366f1}
+    .nav .menu a.active{background:linear-gradient(135deg,#6366f1,#a855f7);color:white;box-shadow:0 2px 8px rgba(99,102,241,0.3)}
+
+    .container{max-width:1280px;margin:0 auto;padding:20px 24px}
+
+    /* ===== 页面标题 ===== */
+    .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+    .page-header h1{font-size:24px;font-weight:700;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;color:#111827}
+    .page-header .sub{font-size:13px;color:#6b7280;font-weight:500}
+
+    /* ===== 邀请码卡片 ===== */
+    .referral-hero{background:linear-gradient(135deg,#6366f1 0%,#a855f7 50%,#d946ef 100%);border-radius:20px;padding:28px 32px;color:white;box-shadow:0 8px 32px rgba(99,102,241,0.25);margin-bottom:20px;position:relative;overflow:hidden}
+    .referral-hero::before{content:'';position:absolute;top:-50%;right:-20%;width:300px;height:300px;background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 70%);border-radius:50%;pointer-events:none}
+    .referral-hero::after{content:'';position:absolute;bottom:-30%;left:-10%;width:200px;height:200px;background:radial-gradient(circle,rgba(255,255,255,0.08) 0%,transparent 70%);border-radius:50%;pointer-events:none}
+    .referral-hero h2{font-size:22px;font-weight:700;margin-bottom:8px;position:relative;z-index:1;letter-spacing:-0.3px}
+    .referral-hero p{font-size:13px;opacity:0.85;margin-bottom:20px;position:relative;z-index:1;line-height:1.6}
+    .referral-hero .code-box{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:14px;padding:14px 20px;border:1px solid rgba(255,255,255,0.2);position:relative;z-index:1;flex-wrap:wrap}
+    .referral-hero .code-box .code-label{font-size:12px;opacity:0.8;font-weight:500}
+    .referral-hero .code-box .code-value{font-size:28px;font-weight:800;letter-spacing:3px;font-family:monospace;flex:1;min-width:120px}
+    .referral-hero .code-box .btn-copy{padding:10px 24px;background:white;color:#6366f1;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;font-family:inherit}
+    .referral-hero .code-box .btn-copy:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+    .referral-hero .code-box .btn-copy.copied{background:#10b981;color:white}
+
+    /* ===== 统计数据 ===== */
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+    .stat-card{background:white;border-radius:16px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f3f4f6;text-align:center;transition:all 0.25s}
+    .stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.08);border-color:#e5e7eb}
+    .stat-card .stat-icon{font-size:28px;margin-bottom:8px}
+    .stat-card .stat-value{font-size:28px;font-weight:800;color:#6366f1;letter-spacing:-0.5px}
+    .stat-card .stat-label{font-size:12px;color:#6b7280;margin-top:4px;font-weight:500}
+
+    /* ===== 邀请记录 ===== */
+    .section-title{font-size:18px;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+    .records-list{background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f3f4f6;overflow:hidden}
+    .record-item{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #f3f4f6;transition:background 0.2s}
+    .record-item:last-child{border-bottom:none}
+    .record-item:hover{background:#faf5ff}
+    .record-item .record-user{display:flex;align-items:center;gap:10px}
+    .record-item .record-user .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a855f7);color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+    .record-item .record-user .info .name{font-size:13px;font-weight:600;color:#111827}
+    .record-item .record-user .info .date{font-size:11px;color:#9ca3af;margin-top:2px}
+    .record-item .record-reward{font-size:14px;font-weight:700;color:#10b981}
+    .record-item .record-reward::before{content:'+¥';font-size:11px;font-weight:600;margin-right:1px}
+
+    /* ===== 邀请说明 ===== */
+    .info-card{background:linear-gradient(135deg,#eef2ff,#faf5ff);border-radius:16px;padding:20px 24px;margin-top:20px;border:2px solid #c7d2fe}
+    .info-card h3{font-size:16px;font-weight:700;color:#4338ca;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .info-card ul{list-style:none;padding:0}
+    .info-card ul li{font-size:13px;color:#374151;padding:6px 0;border-bottom:1px solid rgba(199,210,254,0.4);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+    .info-card ul li:last-child{border-bottom:none}
+    .info-card ul li .dot{color:#6366f1;font-weight:700;flex-shrink:0}
+
+    .loading{text-align:center;padding:40px 20px;color:#6b7280;font-size:14px}
+    .empty-state{text-align:center;padding:40px 20px;background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+    .empty-state .ico{font-size:40px;margin-bottom:10px;opacity:0.5}
+    .empty-state h3{font-size:16px;font-weight:600;margin-bottom:6px;color:#1f2937}
+    .empty-state p{color:#6b7280;font-size:13px}
+
+    @media (max-width:768px){.nav{padding:10px 16px}.container{padding:14px 12px}.page-header h1{font-size:20px}.referral-hero{padding:20px}.referral-hero .code-box .code-value{font-size:22px}.stats-row{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <span>安全练习商城</span>
+    </div>
+    <div class="menu">
+      <a href="/shop">🛒 商城</a>
+      <a href="/cart" style="position:relative">🛍️ 购物车<span id="navCartBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/wishlist">⭐ 收藏</a>
+      <a href="/coupons">🎫 优惠券</a>
+      <a href="/referral" class="active">🤝 邀请好友</a>
+      <a href="/promotions">🎉 促销活动</a>
+      <a href="/orders">📋 订单</a>
+      <a href="/billing">💰 账单</a>
+      <a href="/friends">👥 好友</a>
+      <a href="/chat" style="position:relative">💬 群聊<span id="chatBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/shop/create">🏪 开店</a>
+      <a href="/shop/manage">📦 我的店铺</a>
+      <a href="/cloud">☁️ 文件云盘</a>
+      <a href="/notifications" style="position:relative">📨 通知<span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-14px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:700">0</span></a>
+      <a href="/appeal">📝 申诉</a>
+      <a href="/profile">👤 头像</a>
+      <a href="/logout">退出</a>
+      <a href="/redeem">兑换</a>
+      <a href="/track">📦 查快递</a>
+      <a href="/prompt-generator">🤖 AI生图</a>
+      <a href="/prompt-generator/gallery">🖼️ 画廊</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>🤝 邀请好友</h1>
+      <span class="sub">邀请好友注册，双方均可获得奖励</span>
+    </div>
+
+    <!-- 邀请码区域 -->
+    <div class="referral-hero" id="referralHero">
+      <div class="loading">⏳ 加载邀请信息中...</div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value" id="invitedCount">--</div>
+        <div class="stat-label">已邀请人数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value" id="totalReward">¥--</div>
+        <div class="stat-label">总奖励金额</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-value" id="rewardPoints">--</div>
+        <div class="stat-label">累计积分</div>
+      </div>
+    </div>
+
+    <!-- 邀请记录 -->
+    <div class="section-title">📋 邀请记录</div>
+    <div id="recordsContainer">
+      <div class="loading">⏳ 加载邀请记录中...</div>
+    </div>
+
+    <!-- 邀请说明 -->
+    <div class="info-card">
+      <h3>💡 邀请说明</h3>
+      <ul>
+        <li><span class="dot">1.</span> 将您的专属邀请码分享给好友</li>
+        <li><span class="dot">2.</span> 好友在注册时填写您的邀请码，或通过您的邀请链接注册</li>
+        <li><span class="dot">3.</span> 好友成功注册并完成首次购物后，您将获得奖励</li>
+        <li><span class="dot">4.</span> 奖励将自动发放到您的账户余额中</li>
+        <li><span class="dot">5.</span> 邀请越多，奖励越多，上不封顶！</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function() {
+    var socket = io();
+
+    // 加载邀请码
+    function loadReferralCode() {
+      var hero = document.getElementById('referralHero');
+      fetch('/api/referral/code')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.code) {
+            hero.innerHTML = '<div class="empty-state"><div class="ico">🤝</div><h3>获取邀请码失败</h3><p>请稍后重试</p></div>';
+            return;
+          }
+          var baseUrl = window.location.origin;
+          hero.innerHTML =
+            '<h2>🤝 邀请好友，一起赚钱</h2>' +
+            '<p>分享您的专属邀请码或邀请链接给好友，好友注册后您将获得现金奖励！<br>被邀请的好友也将获得新人优惠券 🎫</p>' +
+            '<div class="code-box">' +
+              '<span class="code-label">我的邀请码</span>' +
+              '<span class="code-value" id="referralCode">' + data.code + '</span>' +
+              '<button class="btn-copy" onclick="copyReferralCode()">📋 复制邀请码</button>' +
+              '<button class="btn-copy" onclick="copyReferralLink()" style="background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3)">🔗 复制链接</button>' +
+            '</div>';
+        })
+        .catch(function() {
+          hero.innerHTML = '<div class="empty-state"><div class="ico">⚠️</div><h3>加载失败</h3><p>无法获取邀请码，请刷新重试</p></div>';
+        });
+    }
+
+    // 复制邀请码
+    window.copyReferralCode = function() {
+      var code = document.getElementById('referralCode');
+      if (!code) return;
+      var text = code.textContent;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() {
+          showCopySuccess();
+        }).catch(function() {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
+    };
+
+    // 复制邀请链接
+    window.copyReferralLink = function() {
+      var code = document.getElementById('referralCode');
+      if (!code) return;
+      var link = window.location.origin + '/register?ref=' + code.textContent;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(link).then(function() {
+          showCopySuccess();
+        }).catch(function() {
+          fallbackCopy(link);
+        });
+      } else {
+        fallbackCopy(link);
+      }
+    };
+
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showCopySuccess();
+    }
+
+    function showCopySuccess() {
+      var btn = document.querySelector('.btn-copy');
+      if (btn) {
+        btn.textContent = '✅ 已复制';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = '📋 复制邀请码';
+          btn.classList.remove('copied');
+        }, 2000);
+      }
+      showToast('📋 已复制到剪贴板！', 'success');
+    }
+
+    // 加载邀请统计
+    function loadReferralStats() {
+      fetch('/api/referral/stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data) return;
+          document.getElementById('invitedCount').textContent = data.invited_count || 0;
+          document.getElementById('totalReward').textContent = '¥' + (data.total_reward || 0);
+          document.getElementById('rewardPoints').textContent = data.points || 0;
+        })
+        .catch(function() {});
+    }
+
+    // 加载邀请记录
+    function loadReferralRecords() {
+      var container = document.getElementById('recordsContainer');
+      fetch('/api/referral/records')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="ico">📋</div><h3>暂无邀请记录</h3><p>快去邀请好友吧！</p></div>';
+            return;
+          }
+          var html = '<div class="records-list">';
+          data.forEach(function(r) {
+            var initials = r.username ? r.username.charAt(0).toUpperCase() : '?';
+            var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('zh-CN') : '--';
+            html += '<div class="record-item">' +
+              '<div class="record-user">' +
+                '<div class="avatar">' + initials + '</div>' +
+                '<div class="info">' +
+                  '<div class="name">' + (r.username || '未知用户') + '</div>' +
+                  '<div class="date">📅 ' + dateStr + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="record-reward">' + (r.reward || 0) + '</div>' +
+            '</div>';
+          });
+          html += '</div>';
+          container.innerHTML = html;
+        })
+        .catch(function() {
+          container.innerHTML = '<div class="empty-state"><div class="ico">⚠️</div><h3>加载失败</h3><p>无法加载邀请记录</p></div>';
+        });
+    }
+
+    function showToast(msg, type) {
+      var bg = type === 'success' ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#ef4444,#dc2626)';
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:20px;right:20px;' + bg + ';color:white;padding:14px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-size:14px;font-weight:500;max-width:360px;animation:slideIn 0.3s ease;transition:all 0.3s';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 2500);
+    }
+
+    // 购物车数量
+    function updateCartBadge(count) {
+      var badge = document.getElementById('navCartBadge');
+      if (!badge) return;
+      if (!count || count <= 0) { badge.style.display = 'none'; return; }
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = 'inline-block';
+    }
+    fetch('/api/cart/count').then(function(r){ return r.json(); }).then(function(data) {
+      updateCartBadge(data.count);
+    }).catch(function(){});
+
+    // Socket.IO
+    socket.on('connect', function() {
+      socket.emit('login', { id: <%= user.id %>, username: '<%= user.username %>', page: '邀请好友' });
+    });
+
+    // 初始化
+    loadReferralCode();
+    loadReferralStats();
+    loadReferralRecords();
+  })();
+  </script>
+  <style>
+    @keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  </style>
+</body>
+</html>

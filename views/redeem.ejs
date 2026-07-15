@@ -52,6 +52,7 @@
       <h2 style="margin-bottom:4px">🎫 兑换优惠券</h2>
       <p class="tip">输入管理员或商家发放的兑换码，领取折扣券。购买时输入优惠码即可使用。</p>
       <form method="POST" action="/redeem">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="redeem-box">
           <input type="text" name="code" placeholder="输入兑换码，如 SAVE20" required autofocus>
           <button type="submit">兑换</button>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>游戏公告管理 · 游戏管理 · 安全练习商城</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;min-height:100vh;color:#1f2937}
+    .nav{background:white;padding:14px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .nav .brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+    .nav a{padding:8px 14px;text-decoration:none;color:#374151;border-radius:10px;font-size:13.5px;font-weight:500;transition:all .15s}
+    .nav a:hover{background:#f3f4f6}
+    .nav a.active{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white}
+    .container{max-width:900px;margin:0 auto;padding:24px}
+    h1{font-size:22px;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .card{background:white;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:20px}
+    .card h2{font-size:17px;margin-bottom:14px}
+    .form-row{display:flex;flex-direction:column;gap:10px}
+    .form-row label{font-size:12px;color:#6b7280;margin-bottom:2px;font-weight:500}
+    .form-row input,.form-row textarea,.form-row select{padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;resize:vertical}
+    .form-row textarea{min-height:80px}
+    .form-row input:focus,.form-row textarea:focus,.form-row select:focus{border-color:#06b6d4}
+    .btn{padding:9px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+    .btn-primary{background:linear-gradient(135deg,#06b6d4,#0891b2);color:white;box-shadow:0 4px 12px rgba(6,182,212,.3)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(6,182,212,.4)}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:2px solid #fecaca}
+    .btn-danger:hover{background:#fee2e2}
+    .btn-sm{padding:6px 12px;font-size:11px;border-radius:8px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f9fafb;padding:12px;text-align:left;font-size:13px;font-weight:600;border-bottom:2px solid #e5e7eb;color:#4b5563}
+    td{padding:12px;border-bottom:1px solid #f3f4f6;font-size:13px}
+    tr:hover td{background:#ecfeff}
+    .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-all{background:#eef2ff;color:#4338ca}
+    .badge-game{background:#ecfdf5;color:#065f46}
+    .empty{text-align:center;padding:40px;color:#9ca3af;font-size:14px}
+    .toast{position:fixed;top:20px;right:20px;background:#059669;color:white;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;display:none;animation:slideIn .3s ease}
+    .toast.error{background:#dc2626}
+    @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+    @media(max-width:768px){.nav{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast"></div>
+  <div class="nav">
+    <span class="brand">📢 游戏公告管理</span>
+    <div>
+      <a href="/admin/dashboard">📊 控制台</a>
+      <a href="/admin/games/seasons">🏆 赛季</a>
+      <a href="/admin/games/announcements" class="active">📢 公告</a>
+      <a href="/admin/games/rooms">🚪 房间</a>
+      <a href="/admin/logout" style="color:#dc2626">退出</a>
+    </div>
+  </div>
+  <div class="container">
+    <h1>📢 游戏公告管理</h1>
+    <div class="card">
+      <h2>➕ 新建公告</h2>
+      <form id="announcementForm">
+        <div class="form-row">
+          <label>公告标题</label>
+          <input type="text" id="title" placeholder="例如：赛季更新通知" required maxlength="100">
+          <label>公告内容</label>
+          <textarea id="content" placeholder="输入公告内容..." required maxlength="500"></textarea>
+          <label>适用游戏</label>
+          <select id="game_type">
+            <option value="all">🎮 全部游戏</option>
+            <option value="chess">♟️ 国际象棋</option>
+            <option value="gomoku">⚫ 五子棋</option>
+            <option value="go">⚪ 围棋</option>
+          </select>
+          <button type="submit" class="btn btn-primary" style="align-self:flex-start;margin-top:4px">发布公告</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>📋 公告列表</h2>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:none" onclick="loadAnnouncements('all')">全部</button>
+        <button class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:none" onclick="loadAnnouncements('chess')">♟️ 国际象棋</button>
+        <button class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:none" onclick="loadAnnouncements('gomoku')">⚫ 五子棋</button>
+        <button class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:none" onclick="loadAnnouncements('go')">⚪ 围棋</button>
+      </div>
+      <div id="announcementList">
+        <div class="empty">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast' + (isError ? ' error' : '');
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    document.getElementById('announcementForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const title = document.getElementById('title').value.trim();
+      const content = document.getElementById('content').value.trim();
+      const game_type = document.getElementById('game_type').value;
+      if (!title || !content) return showToast('标题和内容不能为空', true);
+      fetch('/admin/games/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content, game_type, _csrf: '<%= csrfToken %>' })
+      }).then(r => r.json()).then(data => {
+        if (data.ok) {
+          showToast('公告发布成功');
+          document.getElementById('title').value = '';
+          document.getElementById('content').value = '';
+          loadAnnouncements(document.getElementById('game_type').value);
+        } else {
+          showToast(data.error || '发布失败', true);
+        }
+      }).catch(() => showToast('网络错误', true));
+    });
+
+    function loadAnnouncements(gameType) {
+      const container = document.getElementById('announcementList');
+      container.innerHTML = '<div class="empty">加载中...</div>';
+      fetch('/api/games/announcements?game_type=' + gameType)
+        .then(r => r.json())
+        .then(data => {
+          if (!data || data.length === 0) {
+            container.innerHTML = '<div class="empty">暂无公告</div>';
+            return;
+          }
+          let html = '<table><thead><tr><th>标题</th><th>内容</th><th>适用游戏</th><th>创建时间</th><th>操作</th></tr></thead><tbody>';
+          data.forEach(function(a) {
+            const gameLabel = a.game_type === 'all' ? '<span class="badge badge-all">🎮 全部</span>' : '<span class="badge badge-game">' + (a.game_type || '') + '</span>';
+            html += '<tr><td style="font-weight:500">' + escapeHtml(a.title) + '</td><td style="color:#6b7280;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(a.content) + '</td><td>' + gameLabel + '</td><td style="color:#6b7280">' + (a.created_at || '') + '</td>';
+            html += '<td><button class="btn btn-sm btn-danger" onclick="deleteAnnouncement(' + a.id + ')">删除</button></td></tr>';
+          });
+          html += '</tbody></table>';
+          container.innerHTML = html;
+        })
+        .catch(() => { container.innerHTML = '<div class="empty">加载失败，请重试</div>'; });
+    }
+
+    function deleteAnnouncement(id) {
+      if (!confirm('确定删除此公告？')) return;
+      fetch('/admin/games/announcements/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, _csrf: '<%= csrfToken %>' })
+      }).then(r => r.json()).then(data => {
+        if (data.ok) {
+          showToast('公告已删除');
+          loadAnnouncements('all');
+        } else {
+          showToast('删除失败', true);
+        }
+      }).catch(() => showToast('网络错误', true));
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // 初始加载
+    loadAnnouncements('all');
+  </script>
+</body>
+</html>

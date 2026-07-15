@@ -19,6 +19,11 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label>名称：<input name="name" value="<%= product ? product.name : '' %>" required></label><br>
     <label>价格：<input type="number" step="0.01" name="price" value="<%= product ? product.price : '' %>" required></label><br>
+    <label>分类：<select name="category" style="padding:6px;border:1px solid #ccc;border-radius:6px;font-size:13px;width:200px">
+      <% (categories || []).forEach(function(c) { %>
+        <option value="<%= c.name %>" <%= product && product.category === c.name ? 'selected' : '' %>><%= c.icon %> <%= c.name %></option>
+      <% }) %>
+    </select></label><br>
     <button type="submit">保存</button>
     <a href="/admin/products">取消</a>
   </form>

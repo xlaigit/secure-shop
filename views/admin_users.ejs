@@ -81,7 +81,7 @@
 
   <div class="container">
     <h1 class="page-title">👥 平台用户列表</h1>
-    <p class="page-desc">共 <%= users.length %> 位用户，您可以封禁、解禁、调整余额与信誉分，也可以解除用户的警告状态</p>
+    <p class="page-desc">共 <%= users.length %> 位用户，您可以封禁、解禁、调整余额与信誉分，也可以解除用户的警告状态 <a href="/api/export/admin/users" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;margin-left:8px">📥 导出CSV</a></p>
 
     <div class="table-wrap">
       <% if (users.length === 0) { %>
